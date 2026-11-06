@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/floatingOrbRoot"
+    android:layout_width="64dp"
+    android:layout_height="64dp"
+    android:background="@drawable/bg_floating_orb">
+
+    <ImageView
+        android:id="@+id/ivFloatingReactorRing"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="J.A.R.V.I.S."
+        android:src="@drawable/ic_reactor_outer_ring" />
+
+    <ImageView
+        android:id="@+id/ivFloatingCore"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_gravity="center"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_mic_cyan" />
+</FrameLayout>

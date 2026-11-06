@@ -1,0 +1,2 @@
+-keepattributes *Annotation*, InnerClasses
+-keepclassmembers class kotlinx.serialization.json.** { *** Companion; }

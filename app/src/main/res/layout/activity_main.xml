@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#050B14">
+
+    <LinearLayout
+        android:id="@+id/topBarLayout"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/tvJarvisTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:letterSpacing="0.1"
+            android:text="J.A.R.V.I.S."
+            android:textColor="#00E5FF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvConnectionStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_status_badge"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:text="PHONE"
+            android:textColor="#00E676"
+            android:textSize="11sp" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchPcMode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="PC"
+            android:textColor="#80D8FF"
+            android:textSize="11sp" />
+
+        <ImageButton
+            android:id="@+id/btnSettings"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Settings"
+            android:src="@drawable/ic_settings"
+            app:tint="#00E5FF" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/reactorContainer"
+        android:layout_width="220dp"
+        android:layout_height="220dp"
+        app:layout_constraintBottom_toTopOf="@+id/tvAssistantStatus"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/topBarLayout"
+        app:layout_constraintVertical_chainStyle="packed">
+
+        <ImageView
+            android:id="@+id/ivReactorOuterRing"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="Arc reactor"
+            android:src="@drawable/ic_reactor_outer_ring" />
+
+        <ImageView
+            android:id="@+id/ivReactorCore"
+            android:layout_width="90dp"
+            android:layout_height="90dp"
+            android:layout_gravity="center"
+            android:contentDescription="Microphone"
+            android:src="@drawable/ic_mic_cyan" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/tvAssistantStatus"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:text="Ready."
+        android:textColor="#80D8FF"
+        android:textSize="13sp"
+        app:layout_constraintBottom_toTopOf="@+id/cardMetrics"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/reactorContainer" />
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardMetrics"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginBottom="16dp"
+        app:cardBackgroundColor="#0D1926"
+        app:cardCornerRadius="12dp"
+        app:layout_constraintBottom_toTopOf="@+id/cardResponse"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:strokeColor="#1E3A5F"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/tvCpuMetric"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="CPU: --"
+                android:textColor="#00E5FF"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvRamMetric"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="RAM: --"
+                android:textColor="#00E5FF"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvDiskMetric"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="DISK: --"
+                android:textColor="#00E5FF"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardResponse"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginBottom="16dp"
+        app:cardBackgroundColor="#0D1F33"
+        app:cardCornerRadius="14dp"
+        app:layout_constraintBottom_toTopOf="@+id/bottomInputLayout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:strokeColor="#00E5FF"
+        app:strokeWidth="1dp">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="120dp">
+
+            <TextView
+                android:id="@+id/tvResponseText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp"
+                android:text="J.A.R.V.I.S. is ready. How may I assist you, sir?"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+        </ScrollView>
+    </com.google.android.material.card.MaterialCardView>
+
+    <LinearLayout
+        android:id="@+id/bottomInputLayout"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <EditText
+            android:id="@+id/etCommandInput"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_edit_text"
+            android:hint="Type or speak a command..."
+            android:imeOptions="actionSend"
+            android:inputType="text"
+            android:paddingHorizontal="16dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#546E7A"
+            android:textSize="14sp" />
+
+        <ImageButton
+            android:id="@+id/btnMicToggle"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_icon_button"
+            android:contentDescription="Speak"
+            android:src="@drawable/ic_mic"
+            app:tint="#00E5FF" />
+
+        <ImageButton
+            android:id="@+id/btnSend"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_icon_button_send"
+            android:contentDescription="Send"
+            android:src="@drawable/ic_send"
+            app:tint="#050B14" />
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

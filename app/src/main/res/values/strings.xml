@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">J.A.R.V.I.S.</string>
+    <string name="accessibility_description">Lets J.A.R.V.I.S. open apps, tap buttons, type text and send messages for you when you give a voice command.</string>
+</resources>
