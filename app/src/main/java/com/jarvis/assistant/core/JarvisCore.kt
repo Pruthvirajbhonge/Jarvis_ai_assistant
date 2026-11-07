@@ -117,15 +117,13 @@ class JarvisCore(private val app: Application) {
                 return@launch
             }
 
-            // Phone mode: volume, flashlight and calls are executed on the phone IMMEDIATELY,
-            // without waiting for (or depending on) the AI. Works offline too.
-            if (!latest.pcMode) {
-                val local = hardware.tryHandleText(text)
-                if (local != null && !local.fallThrough) {
-                    _state.update { it.copy(busy = false, reply = local.spoken, lastAction = local.spoken, note = null) }
-                    voice.speak(local.spoken)
-                    return@launch
-                }
+            // Local hardware & instant app launching commands (volume, torch, calls, open app)
+            // are executed on the phone IMMEDIATELY, without waiting for the AI or PC server.
+            val local = hardware.tryHandleText(text)
+            if (local != null && !local.fallThrough) {
+                _state.update { it.copy(busy = false, reply = local.spoken, lastAction = local.spoken, note = null) }
+                voice.speak(local.spoken)
+                return@launch
             }
 
             _state.update { it.copy(busy = true, note = null) }

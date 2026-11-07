@@ -65,6 +65,7 @@ class PhoneHardwareExecutor(context: Context) {
         "volume", "set_volume", "mute", "unmute" -> volume(a)
         "torch", "flashlight", "flash" -> torch(a)
         "call", "dial" -> call(a)
+        "open_app", "app", "open" -> openApp(a.str("app", "name", "package"))
         else -> null
     }
 
@@ -74,7 +75,7 @@ class PhoneHardwareExecutor(context: Context) {
 
     fun interpret(raw: String): PhoneAction? {
         val t = normalize(raw)
-        return parseTorch(t) ?: parseVolume(t) ?: parseCall(raw.trim())
+        return parseTorch(t) ?: parseVolume(t) ?: parseCall(raw.trim()) ?: parseAppLaunch(raw.trim())
     }
 
     /** Lower-cases and converts Devanagari digits (८०) to ASCII (80). */
@@ -308,9 +309,57 @@ class PhoneHardwareExecutor(context: Context) {
         ContextCompat.checkSelfPermission(app, permission) == PackageManager.PERMISSION_GRANTED
 
     // ================================================================================================
+    // APP LAUNCHING (Offline rule-based launch)
+    // ================================================================================================
+
+    private fun parseAppLaunch(raw: String): PhoneAction? {
+        val t = raw.lowercase().trim()
+        val appName = when {
+            t.contains("youtube") -> "youtube"
+            t.contains("spotify") || t == "play music" -> "spotify"
+            t.contains("chrome") || t == "open browser" -> "chrome"
+            t.contains("whatsapp") -> "whatsapp"
+            t.startsWith("open ") -> t.removePrefix("open ").trim()
+            t.startsWith("launch ") -> t.removePrefix("launch ").trim()
+            else -> null
+        } ?: return null
+        return act("open_app", "app" to appName)
+    }
+
+    private fun openApp(name: String?): Outcome {
+        if (name.isNullOrBlank()) return Outcome("Which app should I open?", false)
+        val pm = app.packageManager
+        val launch: Intent? = if (name.contains('.')) {
+            pm.getLaunchIntentForPackage(name)
+        } else {
+            val query = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            @Suppress("DEPRECATION")
+            val apps = if (android.os.Build.VERSION.SDK_INT >= 33) {
+                pm.queryIntentActivities(query, PackageManager.ResolveInfoFlags.of(0))
+            } else {
+                pm.queryIntentActivities(query, 0)
+            }
+            val match = apps.firstOrNull { it.loadLabel(pm).toString().equals(name, true) }
+                ?: apps.firstOrNull { it.loadLabel(pm).toString().contains(name, true) }
+            match?.let { pm.getLaunchIntentForPackage(it.activityInfo.packageName) }
+        }
+        return if (launch != null) {
+            try {
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                app.startActivity(launch)
+                Outcome("Opening $name.", true)
+            } catch (e: Exception) {
+                Outcome("Could not launch $name: ${e.message}", false)
+            }
+        } else {
+            Outcome("I couldn't find an app called $name.", false, fallThrough = true)
+        }
+    }
+
+    // ================================================================================================
 
     private companion object {
-        val HARDWARE_ACTIONS = setOf("volume", "set_volume", "mute", "unmute", "torch", "flashlight", "flash", "call", "dial")
+        val HARDWARE_ACTIONS = setOf("volume", "set_volume", "mute", "unmute", "torch", "flashlight", "flash", "call", "dial", "open_app", "app", "open")
 
         val VOLUME_WORDS = Regex("""\b(volume|sound|audio|louder|quieter|softer|mute|unmute|silent)\b|आवाज|वॉल्यूम|व्हॉल्यूम|म्यूट|अनम्यूट|ध्वनी|ध्वनि""")
         val UNMUTE = Regex("""\bunmute\b|अनम्यूट|आवाज\s*चालू""")
