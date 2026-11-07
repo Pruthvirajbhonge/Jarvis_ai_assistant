@@ -17,15 +17,18 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <!-- TOP HUD STATUS HEADER -->
+    <!-- TOP HUD STATUS HEADER -->
     <LinearLayout
         android:id="@+id/topBarLayout"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_glass_card"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="8dp"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="8dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -35,11 +38,11 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_glass_card_active"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="6dp"
-            android:text="Connected • PC Online"
-            android:textColor="#00E676"
-            android:textSize="11sp"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="5dp"
+            android:text="● PHONE READY"
+            android:textColor="#4DD0E1"
+            android:textSize="10sp"
             android:textStyle="bold" />
 
         <LinearLayout
@@ -56,7 +59,7 @@
                 android:letterSpacing="0.25"
                 android:text="J.A.R.V.I.S."
                 android:textColor="#00E5FF"
-                android:textSize="18sp"
+                android:textSize="17sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -64,8 +67,8 @@
                 android:layout_height="wrap_content"
                 android:letterSpacing="0.08"
                 android:text="Your AI Assistant"
-                android:textColor="#90CAF9"
-                android:textSize="11sp" />
+                android:textColor="#80D8FF"
+                android:textSize="10sp" />
         </LinearLayout>
 
         <com.google.android.material.materialswitch.MaterialSwitch
@@ -78,8 +81,9 @@
 
         <ImageButton
             android:id="@+id/btnSettings"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="4dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Settings"
             android:src="@drawable/ic_settings"
@@ -96,56 +100,63 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/topBarLayout">
 
-        <!-- 1. HOME SCREEN VIEW -->
-        <ScrollView
+        <!-- 1. HOME SCREEN VIEW (FULL WIDTH REACTOR & ZERO BOTTOM GAP) -->
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/homeViewLayout"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fillViewport="true"
-            android:scrollbars="none">
+            android:layout_height="match_parent">
 
+            <!-- CENTRAL HOLOGRAPHIC ARC REACTOR (FULL WIDTH & DYNAMIC HEIGHT) -->
+            <FrameLayout
+                android:id="@+id/reactorContainer"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:padding="0dp"
+                app:layout_constraintBottom_toTopOf="@+id/bottomControlsLayout"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent">
+
+                <com.jarvis.assistant.ui.JarvisReactorView
+                    android:id="@+id/reactorView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
+                <!-- Legacy ImageViews for safety -->
+                <ImageView
+                    android:id="@+id/ivReactorOuterRing"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone"
+                    tools:ignore="ContentDescription" />
+
+                <ImageView
+                    android:id="@+id/ivReactorCore"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone"
+                    tools:ignore="ContentDescription" />
+            </FrameLayout>
+
+            <!-- DOCKED BOTTOM CONTROLS LAYOUT (ZERO GAP AT BOTTOM SIDE) -->
             <LinearLayout
-                android:layout_width="match_parent"
+                android:id="@+id/bottomControlsLayout"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:gravity="center_horizontal"
                 android:orientation="vertical"
                 android:paddingHorizontal="16dp"
-                android:paddingBottom="16dp">
-
-                <!-- CENTRAL HOLOGRAPHIC ARC REACTOR (MAIN PRIORITY DISPLAY) -->
-                <FrameLayout
-                    android:id="@+id/reactorContainer"
-                    android:layout_width="310dp"
-                    android:layout_height="310dp"
-                    android:layout_marginTop="2dp">
-
-                    <com.jarvis.assistant.ui.JarvisReactorView
-                        android:id="@+id/reactorView"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent" />
-
-                    <!-- Legacy ImageViews for safety -->
-                    <ImageView
-                        android:id="@+id/ivReactorOuterRing"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:visibility="gone"
-                        tools:ignore="ContentDescription" />
-
-                    <ImageView
-                        android:id="@+id/ivReactorCore"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:visibility="gone"
-                        tools:ignore="ContentDescription" />
-                </FrameLayout>
+                android:paddingBottom="4dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent">
 
                 <!-- SINGLE STATUS PILL -->
                 <LinearLayout
                     android:id="@+id/statusPillLayout"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="2dp"
                     android:background="@drawable/bg_glass_card"
                     android:gravity="center"
                     android:orientation="horizontal"
@@ -175,7 +186,7 @@
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="4dp"
                     android:orientation="horizontal">
 
                     <TextView
@@ -219,7 +230,7 @@
                     android:id="@+id/cardMetrics"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="6dp"
                     app:cardBackgroundColor="#800A1628"
                     app:cardCornerRadius="12dp"
                     app:strokeColor="#1A3A5E"
@@ -321,7 +332,7 @@
                     android:id="@+id/cardControlDeck"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="6dp"
                     app:cardBackgroundColor="#800A1628"
                     app:cardCornerRadius="12dp"
                     app:strokeColor="#00E5FF"
@@ -481,12 +492,12 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- J.A.R.V.I.S. RESPONSE CARD (COMPACT 56dp) -->
+                <!-- J.A.R.V.I.S. RESPONSE CARD (COMPACT 52dp) -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardResponse"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="6dp"
                     app:cardBackgroundColor="#800A1628"
                     app:cardCornerRadius="12dp"
                     app:strokeColor="#1A3A5E"
@@ -494,14 +505,14 @@
 
                     <ScrollView
                         android:layout_width="match_parent"
-                        android:layout_height="56dp">
+                        android:layout_height="52dp">
 
                         <TextView
                             android:id="@+id/tvResponseText"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:lineSpacingExtra="2dp"
-                            android:padding="10dp"
+                            android:padding="8dp"
                             android:text="J.A.R.V.I.S. is online and ready. How may I assist you, sir?"
                             android:textColor="#FFFFFF"
                             android:textSize="12sp" />
@@ -513,14 +524,14 @@
                     android:id="@+id/bottomInputLayout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="6dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
                     <EditText
                         android:id="@+id/etCommandInput"
                         android:layout_width="0dp"
-                        android:layout_height="42dp"
+                        android:layout_height="40dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_glass_card"
                         android:hint="Say something..."
@@ -533,8 +544,8 @@
 
                     <ImageButton
                         android:id="@+id/btnMicToggle"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
                         android:layout_marginStart="6dp"
                         android:background="@drawable/bg_quick_action_btn"
                         android:contentDescription="Speak"
@@ -543,8 +554,8 @@
 
                     <ImageButton
                         android:id="@+id/btnSend"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
                         android:layout_marginStart="6dp"
                         android:background="@drawable/bg_reactor_center_btn"
                         android:contentDescription="Send"
@@ -553,7 +564,8 @@
                 </LinearLayout>
 
             </LinearLayout>
-        </ScrollView>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
         <!-- 2. TABS SCREEN VIEW (SCREEN 4 IN REFERENCE IMAGE) -->
         <LinearLayout
@@ -942,24 +954,31 @@
                 android:textSize="10sp" />
         </LinearLayout>
 
-        <FrameLayout
+        <!-- NAV 3: CENTRAL VOICE REACTOR PULSE BUTTON (PERFECT ALIGNMENT) -->
+        <LinearLayout
             android:id="@+id/navCentralReactorBtn"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:layout_marginBottom="12dp"
-            android:background="@drawable/bg_reactor_center_btn"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
             android:clickable="true"
-            android:elevation="6dp"
-            android:focusable="true">
+            android:focusable="true"
+            android:gravity="center">
 
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_gravity="center"
-                android:contentDescription="Reactor Voice"
-                android:src="@drawable/ic_wave_visualizer"
-                app:tint="#050B14" />
-        </FrameLayout>
+            <FrameLayout
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_reactor_center_btn"
+                android:elevation="4dp">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Reactor Voice"
+                    android:src="@drawable/ic_wave_visualizer"
+                    app:tint="#050B14" />
+            </FrameLayout>
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/navHistory"

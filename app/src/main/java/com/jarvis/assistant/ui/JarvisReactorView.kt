@@ -207,10 +207,10 @@ class JarvisReactorView : View {
         canvas.drawLine(w - margin - bracketSize, h - margin, w - margin, h - margin, linePaint)
         canvas.drawLine(w - margin, h - margin, w - margin, h - margin - bracketSize, linePaint)
 
-        hudTextPaint.textSize = radius * 0.065f
-        canvas.drawText("CORE v3.0", margin + 8f, margin + radius * 0.12f, hudTextPaint)
-        canvas.drawText("CONTEXT AWARE", margin + 8f, margin + radius * 0.20f, hudTextPaint)
-        canvas.drawText("WINDOWS + ANDROID", margin + 8f, margin + radius * 0.28f, hudTextPaint)
+        hudTextPaint.textSize = radius * 0.055f
+        canvas.drawText("CORE v3.0", margin + 8f, margin + radius * 0.22f, hudTextPaint)
+        canvas.drawText("CONTEXT AWARE", margin + 8f, margin + radius * 0.29f, hudTextPaint)
+        canvas.drawText("WINDOWS + ANDROID", margin + 8f, margin + radius * 0.36f, hudTextPaint)
     }
 
     private fun drawCentralGlow(canvas: Canvas, cx: Float, cy: Float, radius: Float, activeColor: Int) {
@@ -381,14 +381,17 @@ class JarvisReactorView : View {
 
         rectCore.set(cx - coreR, cy - coreR, cx + coreR, cy + coreR)
 
+        // 1. TOP TEXT: J.A.R.V.I.S. (Fits completely inside inner circle)
         textPaint.color = Color.WHITE
-        textPaint.textSize = coreR * 0.40f
-        textPaint.letterSpacing = 0.30f
-        canvas.drawText("J.A.R.V.I.S.", cx, cy - coreR * 0.40f, textPaint)
+        textPaint.textSize = coreR * 0.25f
+        textPaint.letterSpacing = 0.16f
+        canvas.drawText("J.A.R.V.I.S.", cx, cy - coreR * 0.44f, textPaint)
 
-        val micH = coreR * 0.40f
+        // 2. CENTER ICON: Vector Microphone + Radiating Sound Waves
+        val micH = coreR * 0.44f
         drawVectorMicWithWaves(canvas, cx, cy, micH, activeColor)
 
+        // 3. BOTTOM TEXT: SYSTEM ONLINE (Fits neatly inside circle)
         val statusStr = when (state) {
             State.LISTENING -> "LISTENING..."
             State.PROCESSING -> "PROCESSING..."
@@ -398,9 +401,9 @@ class JarvisReactorView : View {
             State.IDLE -> "SYSTEM ONLINE"
         }
         textPaint.color = activeColor
-        textPaint.textSize = coreR * 0.20f
-        textPaint.letterSpacing = 0.15f
-        canvas.drawText(statusStr, cx, cy + coreR * 0.64f, textPaint)
+        textPaint.textSize = coreR * 0.16f
+        textPaint.letterSpacing = 0.12f
+        canvas.drawText(statusStr, cx, cy + coreR * 0.58f, textPaint)
     }
 
     private fun drawVectorMicWithWaves(canvas: Canvas, cx: Float, cy: Float, micHeight: Float, activeColor: Int) {

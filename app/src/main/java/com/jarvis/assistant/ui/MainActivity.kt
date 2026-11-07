@@ -266,10 +266,6 @@ class MainActivity : AppCompatActivity() {
         binding.tabsViewLayout.visibility = if (index == 1) View.VISIBLE else View.GONE
         binding.historyViewLayout.visibility = if (index == 3) View.VISIBLE else View.GONE
         binding.settingsViewLayout.visibility = if (index == 4) View.VISIBLE else View.GONE
-
-        if (index == 0) {
-            binding.homeViewLayout.smoothScrollTo(0, 0)
-        }
     }
 
     private fun setupTabsScreen() {
