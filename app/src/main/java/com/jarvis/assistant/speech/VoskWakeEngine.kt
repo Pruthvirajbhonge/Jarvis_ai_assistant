@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AutomaticGainControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -13,6 +14,9 @@ import org.vosk.Recognizer
 import java.io.File
 import java.io.IOException
 import java.util.zip.ZipInputStream
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sqrt
 
 /**
  * Always-on, fully offline "Jarvis" detector. It opens the microphone ONCE and keeps reading
@@ -69,6 +73,15 @@ class VoskWakeEngine(
                 throw IllegalStateException("Microphone is not available.")
             }
 
+            // 1) Hardware AGC (only where the phone supports it)
+            val agc = if (AutomaticGainControl.isAvailable()) {
+                try {
+                    AutomaticGainControl.create(audio.audioSessionId)?.apply { enabled = true }
+                } catch (e: Exception) { null }
+            } else null
+
+            var gain = START_GAIN
+
             Recognizer(m, SAMPLE_RATE).use { rec ->
                 try {
                     audio.startRecording()
@@ -77,6 +90,28 @@ class VoskWakeEngine(
                         val n = audio.read(buf, 0, buf.size)
                         if (n < 0) throw IOException("Audio read error $n")
                         if (n == 0) continue
+
+                        // 2) Adaptive software gain for far / quiet voices.
+                        var sumSq = 0.0
+                        var peak = 1
+                        for (i in 0 until n) {
+                            val v = buf[i].toInt()
+                            sumSq += v.toDouble() * v
+                            peak = max(peak, if (v < 0) -v else v)
+                        }
+                        val rms = sqrt(sumSq / n)
+                        if (rms > NOISE_FLOOR_RMS) { // never boost pure background noise
+                            val wanted = (TARGET_RMS / rms).toFloat().coerceIn(1f, MAX_GAIN)
+                            // fall fast (avoid clipping), rise slowly (avoid pumping)
+                            gain += (wanted - gain) * (if (wanted < gain) 0.5f else 0.1f)
+                        }
+                        gain = min(gain, PEAK_LIMIT / peak) // never clip
+                        gain = max(gain, 1f)
+                        if (gain > 1.01f) {
+                            for (i in 0 until n) {
+                                buf[i] = (buf[i] * gain).toInt().coerceIn(-32768, 32767).toShort()
+                            }
+                        }
                         val json = if (rec.acceptWaveForm(buf, n)) rec.result else rec.partialResult
                         val o = JSONObject(json)
                         val text = o.optString("text").ifEmpty { o.optString("partial") }
@@ -94,6 +129,7 @@ class VoskWakeEngine(
                         }
                     }
                 } finally {
+                    try { agc?.release() } catch (e: Exception) {}
                     try { audio.stop() } catch (e: Exception) {}
                     audio.release()
                 }
@@ -159,6 +195,13 @@ class VoskWakeEngine(
 
     private companion object {
         const val SAMPLE_RATE = 16000f
+
+        // Adaptive gain tuning
+        const val START_GAIN = 2f
+        const val MAX_GAIN = 8f            // loudest boost for very distant voices
+        const val TARGET_RMS = 3000.0      // about -20 dBFS, a comfortable level for Vosk
+        const val NOISE_FLOOR_RMS = 40.0   // below this it's silence: don't amplify it
+        const val PEAK_LIMIT = 30000f      // keep headroom under 32767 so audio never clips
         const val MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-in-0.4.zip"
         val modelLock = Any()
         val WAKE = Regex("\\b(jarvis|jar vis|jarvish|jarves|jarvas|javis)\\b", RegexOption.IGNORE_CASE)
