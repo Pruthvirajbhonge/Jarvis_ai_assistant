@@ -47,6 +47,7 @@ class VoiceInteractionManager(context: Context) {
     var onTranscript: ((String) -> Unit)? = null
     var onModeChanged: ((Mode) -> Unit)? = null
     var onError: ((String) -> Unit)? = null
+    var onAudioRms: ((Float) -> Unit)? = null
 
     /** BCP-47 tag. Use "mr-IN" or "hi-IN" for Marathi / Hindi commands. */
     var recognitionLocale: String = "en-IN"
@@ -249,7 +250,11 @@ class VoiceInteractionManager(context: Context) {
 
         override fun onReadyForSpeech(params: Bundle?) {}
         override fun onBeginningOfSpeech() {}
-        override fun onRmsChanged(rmsdB: Float) {}
+        override fun onRmsChanged(rmsdB: Float) {
+            if (id != sessionId) return
+            val normalized = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
+            onAudioRms?.invoke(normalized)
+        }
         override fun onBufferReceived(buffer: ByteArray?) {}
         override fun onEndOfSpeech() {}
         override fun onPartialResults(partialResults: Bundle?) {}

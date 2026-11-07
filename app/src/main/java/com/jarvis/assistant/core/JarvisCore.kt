@@ -83,6 +83,7 @@ class JarvisCore(private val app: Application) {
 
     init {
         voice.onModeChanged = { m -> _state.update { it.copy(mode = m) } }
+        voice.onAudioRms = { rms -> _state.update { it.copy(audioRms = rms) } }
         voice.onWakeWord = {
             wakeScreen()
             voice.startCommandSession()
