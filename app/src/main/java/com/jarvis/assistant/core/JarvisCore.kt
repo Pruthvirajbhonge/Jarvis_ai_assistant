@@ -9,6 +9,7 @@ import android.os.Environment
 import android.os.PowerManager
 import android.os.StatFs
 import com.jarvis.assistant.automation.PhoneActionExecutor
+import com.jarvis.assistant.automation.PhoneHardwareExecutor
 import com.jarvis.assistant.automation.UiAgent
 import com.jarvis.assistant.data.db.AppDatabase
 import com.jarvis.assistant.data.db.TaskEntity
@@ -46,6 +47,7 @@ class JarvisCore(private val app: Application) {
     val voice = VoiceInteractionManager(app)
 
     private val executor = PhoneActionExecutor(app)
+    private val hardware = PhoneHardwareExecutor(app)
     private val taskDao = AppDatabase.get(app).taskDao()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -114,22 +116,37 @@ class JarvisCore(private val app: Application) {
                 return@launch
             }
 
+            // Phone mode: volume, flashlight and calls are executed on the phone IMMEDIATELY,
+            // without waiting for (or depending on) the AI. Works offline too.
+            if (!latest.pcMode) {
+                val local = hardware.tryHandleText(text)
+                if (local != null && !local.fallThrough) {
+                    _state.update { it.copy(busy = false, reply = local.spoken, lastAction = local.spoken, note = null) }
+                    voice.speak(local.spoken)
+                    return@launch
+                }
+            }
+
             _state.update { it.copy(busy = true, note = null) }
             val result = repository.ask(text)
-            var reply = result.reply
             val action = result.action
+            var spoken = result.reply
+            var executed: String? = null
 
             if (action != null) {
-                if (reply.isNotBlank()) {
-                    _state.update { it.copy(reply = reply) }
-                    voice.speak(reply)
+                val isUiTask = action.action.equals("ui_task", true)
+                if (isUiTask && spoken.isNotBlank()) { // long multi-step job: acknowledge first
+                    _state.update { it.copy(reply = spoken) }
+                    voice.speak(spoken)
                 }
-                val outcome = runAction(action)
-                if (action.action.equals("ui_task", true) || reply.isBlank()) reply = outcome
+                val outcome = runAction(action) // really changes the phone
+                executed = outcome
+                // Hardware actions are confirmed with what REALLY happened, not what the AI claimed.
+                spoken = if (isUiTask || hardware.handles(action.action) || spoken.isBlank()) outcome else spoken
             }
-            if (reply.isBlank()) reply = "No response."
-            _state.update { it.copy(busy = false, reply = reply, note = result.note) }
-            voice.speak(reply)
+            if (spoken.isBlank()) spoken = "No response."
+            _state.update { it.copy(busy = false, reply = spoken, lastAction = executed, note = result.note) }
+            voice.speak(spoken)
         }
     }
 

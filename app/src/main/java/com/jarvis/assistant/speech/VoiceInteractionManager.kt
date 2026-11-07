@@ -8,9 +8,6 @@ import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
-import java.util.Locale
 
 /**
  * One owner for the microphone: it runs either the "Hey Jarvis" wake loop (WAKE) or a single
@@ -27,8 +24,8 @@ class VoiceInteractionManager(context: Context) {
     private val appContext = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
-    private var tts: TextToSpeech? = null
-    private var ttsReady = false
+    /** Natural J.A.R.V.I.S. voice (Edge neural online, tuned Android voice offline). */
+    private val voiceOut = JarvisVoiceManager(appContext)
     private var speaking = false
     private var wakeEnabled = false
     private var sessionId = 0
@@ -60,20 +57,8 @@ class VoiceInteractionManager(context: Context) {
     )
 
     init {
-        tts = TextToSpeech(appContext) { status ->
-            ttsReady = status == TextToSpeech.SUCCESS
-            if (ttsReady) {
-                tts?.setLanguage(Locale.forLanguageTag("en-IN"))
-                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {}
-                    override fun onDone(utteranceId: String?) = speechFinished()
-
-                    @Suppress("OVERRIDE_DEPRECATION")
-                    override fun onError(utteranceId: String?) = speechFinished()
-                    override fun onError(utteranceId: String?, errorCode: Int) = speechFinished()
-                })
-            }
-        }
+        // Pause the wake-word mic while Jarvis talks; resume when the reply has completely finished.
+        voiceOut.onSpeechDone = { speechFinished() }
     }
 
     // ---- public API -------------------------------------------------------------------------
@@ -95,24 +80,21 @@ class VoiceInteractionManager(context: Context) {
 
     fun startCommandSession() = runOnMain {
         engine.stop() // free the mic for the command recognizer
-        tts?.stop()
+        voiceOut.stop()
         speaking = false
         beginRecognition(Mode.COMMAND)
     }
 
     fun speak(text: String) = runOnMain {
-        val engine = tts
-        if (!ttsReady || engine == null || text.isBlank()) return@runOnMain
+        if (text.isBlank()) return@runOnMain
         if (mode == Mode.WAKE) { // don't let the wake loop hear our own voice
             engine.stop()
             main.removeCallbacksAndMessages(null)
             cancelRecognizer()
             setMode(Mode.IDLE)
         }
-        selectLanguage(engine, text)
         speaking = true
-        val limit = TextToSpeech.getMaxSpeechInputLength() - 1
-        engine.speak(text.take(limit), TextToSpeech.QUEUE_FLUSH, null, "jarvis-${System.nanoTime()}")
+        voiceOut.speak(text)
     }
 
     // ---- internals --------------------------------------------------------------------------
@@ -132,15 +114,6 @@ class VoiceInteractionManager(context: Context) {
         main.post {
             speaking = false
             if (wakeEnabled && mode == Mode.IDLE) scheduleWake(600)
-        }
-    }
-
-    private fun selectLanguage(engine: TextToSpeech, text: String) {
-        val devanagari = text.any { it in '\u0900'..'\u097F' }
-        val tags = if (devanagari) listOf("mr-IN", "hi-IN") else listOf("en-IN", "en-US")
-        for (tag in tags) {
-            val r = engine.setLanguage(Locale.forLanguageTag(tag))
-            if (r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED) return
         }
     }
 

@@ -13,5 +13,7 @@ data class UiState(
     val connection: Connection = Connection.NO_AI,
     val pcMode: Boolean = false,
     val note: String? = null,
+    /** Result of the last phone action that was really executed (volume, torch, call...). */
+    val lastAction: String? = null,
     val stats: List<Stat> = listOf(Stat("BAT", null), Stat("RAM", null), Stat("DISK", null))
 )

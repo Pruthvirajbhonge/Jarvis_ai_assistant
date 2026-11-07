@@ -12,6 +12,7 @@ import android.view.animation.Animation
 import android.view.animation.LinearInterpolator
 import android.view.animation.RotateAnimation
 import android.view.inputmethod.EditorInfo
+import android.widget.Toast
 import android.widget.CompoundButton
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -40,8 +41,17 @@ class MainActivity : AppCompatActivity() {
     private val viewModel: MainViewModel by viewModels()
 
     private val permissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
             startJarvisBackgroundService()
+            val callingDenied = results[Manifest.permission.CALL_PHONE] == false ||
+                results[Manifest.permission.READ_CONTACTS] == false
+            if (callingDenied) {
+                Toast.makeText(
+                    this,
+                    "Allow Phone and Contacts permission, otherwise I can't call people by voice.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
 
     private val pcSwitchListener = CompoundButton.OnCheckedChangeListener { _, checked ->
@@ -125,7 +135,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun render(s: UiState) {
-        binding.tvResponseText.text = s.reply
+        // Reply + (if different) the real result of the phone action, e.g. "Volume set to 80 percent."
+        val executed = s.lastAction?.takeIf { it.isNotBlank() && it != s.reply }
+        binding.tvResponseText.text = if (executed != null) "${s.reply}\n\n⚙ $executed" else s.reply
         binding.tvAssistantStatus.text = when {
             s.busy -> s.note ?: "Processing command..."
             s.mode == Mode.COMMAND -> "Listening..."
@@ -175,6 +187,8 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val current = viewModel.settings.current()
             val b = DialogSettingsBinding.inflate(layoutInflater)
+            b.etGeminiModel.hint = JarvisSettings.DEFAULT_GEMINI
+            b.etGroqModel.hint = JarvisSettings.DEFAULT_GROQ
             b.etGeminiKey.setText(current.geminiKey)
             b.etGeminiModel.setText(current.geminiModel)
             b.etGroqKey.setText(current.groqKey)

@@ -6,8 +6,6 @@ import android.app.SearchManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
@@ -25,7 +23,7 @@ import kotlinx.coroutines.withContext
 /** Runs phone-side actions requested by the AI (phone mode) or by the PC backend (PC mode). */
 class PhoneActionExecutor(private val context: Context) {
 
-    private var torchOn = false
+    private val hardware = PhoneHardwareExecutor(context)
 
     /** Returns a short human-readable outcome; never throws. */
     suspend fun execute(a: PhoneAction): String = withContext(Dispatchers.Main) {
@@ -33,7 +31,9 @@ class PhoneActionExecutor(private val context: Context) {
             when (a.action.lowercase()) {
                 // apps & communication
                 "open_app" -> openApp(a.str("app", "name", "package"))
-                "call" -> call(a)
+                // volume / flashlight / calls are really executed by PhoneHardwareExecutor
+                "call", "dial", "volume", "set_volume", "mute", "unmute", "torch", "flashlight" ->
+                    hardware.execute(a)?.spoken ?: "That didn't work."
                 "sms" -> sms(a)
                 "whatsapp" -> whatsapp(a)
                 "email" -> email(a)
@@ -47,8 +47,6 @@ class PhoneActionExecutor(private val context: Context) {
                 "camera" -> camera()
                 "settings" -> openSettings(a.str("page", "name"))
                 // hardware
-                "torch", "flashlight" -> torch(a)
-                "volume" -> volume(a)
                 "brightness" -> brightness(a)
                 "media" -> media(a.str("command", "action"))
                 // screen control (Accessibility)
@@ -117,15 +115,6 @@ class PhoneActionExecutor(private val context: Context) {
     }
 
     // ---- calls & messages ---------------------------------------------------------------------
-
-    private fun call(a: PhoneAction): String {
-        val number = a.str("number", "phone") ?: a.str("name", "contact")?.let { lookupNumber(it) }
-            ?: return "I couldn't find that contact's number."
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) ==
-            PackageManager.PERMISSION_GRANTED
-        launch(Intent(if (granted) Intent.ACTION_CALL else Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(number)}")))
-        return if (granted) "Calling $number." else "Opened the dialer for $number."
-    }
 
     private suspend fun sms(a: PhoneAction): String {
         val message = a.str("message", "text").orEmpty()
@@ -266,40 +255,6 @@ class PhoneActionExecutor(private val context: Context) {
     }
 
     // ---- hardware -----------------------------------------------------------------------------
-
-    private fun torch(a: PhoneAction): String {
-        val cm = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        val id = cm.cameraIdList.firstOrNull {
-            cm.getCameraCharacteristics(it).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
-        } ?: return "This phone has no flashlight."
-        val want = when (a.str("state", "mode")?.lowercase()) {
-            "on", "true" -> true
-            "off", "false" -> false
-            else -> !torchOn
-        }
-        cm.setTorchMode(id, want)
-        torchOn = want
-        return if (want) "Flashlight on." else "Flashlight off."
-    }
-
-    private fun volume(a: PhoneAction): String {
-        val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val level = a.str("level", "percent")?.toIntOrNull()
-        if (level != null) {
-            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            am.setStreamVolume(AudioManager.STREAM_MUSIC, level.coerceIn(0, 100) * max / 100, AudioManager.FLAG_SHOW_UI)
-            return "Volume set to ${level.coerceIn(0, 100)} percent."
-        }
-        val direction = when (a.str("direction", "state")?.lowercase()) {
-            "up", "increase", "raise" -> AudioManager.ADJUST_RAISE
-            "down", "decrease", "lower" -> AudioManager.ADJUST_LOWER
-            "mute" -> AudioManager.ADJUST_MUTE
-            "unmute" -> AudioManager.ADJUST_UNMUTE
-            else -> return "I didn't understand that volume command."
-        }
-        am.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
-        return "Done."
-    }
 
     private fun brightness(a: PhoneAction): String {
         if (!Settings.System.canWrite(context)) {

@@ -43,15 +43,16 @@ interface LlmProvider {
     suspend fun complete(system: String, history: List<ChatMsg>, user: String): String
 }
 
-private fun cleanModelName(name: String): String {
-    var m = name.trim().lowercase().replace(" ", "-")
-    m = m.replace("vercatile", "versatile")
-        .replace("gemini-2.5-flash", "gemini-2.0-flash")
-        .replace("gemini-1.5-flash-8b", "gemini-1.5-flash")
-        .replace("grok-3-mini", "grok-2-latest")
-        .replace("mixtral-8x7b-32768", "llama-3.3-70b-versatile")
-        .replace("llama-3.1-70b", "llama-3.3-70b-versatile")
-    return m
+private const val GEMINI_VERIFIED = "gemini-3.5-flash-lite"
+
+/** Fixes typos only. (It no longer rewrites valid model names into retired ones.) */
+private fun cleanModelName(name: String): String =
+    name.trim().lowercase().replace(" ", "-").replace("vercatile", "versatile")
+
+/** gemini-1.5-* and gemini-2.0-* return 404, so they are never sent. */
+private fun usableGeminiModel(name: String): String {
+    val m = cleanModelName(name)
+    return if (m.isEmpty() || m.startsWith("gemini-1.5") || m.startsWith("gemini-2.0")) GEMINI_VERIFIED else m
 }
 
 // ---- shared HTTP ----------------------------------------------------------------------------
@@ -105,8 +106,8 @@ class GeminiProvider(
 ) : LlmProvider {
     override val name = "Gemini"
 
-    private val models = (listOf(cleanModelName(model)) + listOf("gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite"))
-        .filter { it.isNotEmpty() }.distinct()
+    // Configured model first, then the verified one, then Google's "latest lite" alias.
+    private val models = listOf(usableGeminiModel(model), GEMINI_VERIFIED, "gemini-flash-lite-latest").distinct()
 
     override suspend fun complete(system: String, history: List<ChatMsg>, user: String): String {
         var last: ProviderException? = null
@@ -219,7 +220,7 @@ fun JarvisSettings.buildProviders(client: OkHttpClient): List<LlmProvider> = bui
         add(OpenAiCompatProvider(
             "Groq", client, "https://api.groq.com/openai/v1", groqKey.trim(),
             groqModel.trim().ifEmpty { JarvisSettings.DEFAULT_GROQ },
-            listOf("llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192")
+            listOf("openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant")
         ))
     }
     if (xaiKey.isNotBlank()) {
