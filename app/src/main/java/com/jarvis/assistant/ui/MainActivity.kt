@@ -7,8 +7,8 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.view.HapticFeedbackConstants
 import android.provider.Settings
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.CompoundButton
@@ -25,7 +25,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.jarvis.assistant.R
 import com.jarvis.assistant.core.Connection
@@ -47,9 +46,11 @@ class MainActivity : AppCompatActivity() {
     private val deckSections = listOf("QUICK ACTIONS", "SYSTEM COMMANDS", "MEDIA CONTROLS")
 
     private val activeTabsList = mutableListOf(
-        BrowserTab("1", "Google", "www.google.com", R.drawable.ic_search),
-        BrowserTab("2", "YouTube", "m.youtube.com", R.drawable.ic_youtube)
+        BrowserTab("1", "YouTube", "m.youtube.com", R.drawable.ic_youtube, true),
+        BrowserTab("2", "Google", "www.google.com", R.drawable.ic_search, false)
     )
+
+    private lateinit var tabAdapter: TabAdapter
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
@@ -88,7 +89,8 @@ class MainActivity : AppCompatActivity() {
         setupClickListeners()
         setupControlDeck()
         setupBottomNavigation()
-        setupTabPreview()
+        setupTabsScreen()
+        setupSettingsScreen()
         observeState()
         requestMandatoryPermissions()
     }
@@ -107,20 +109,42 @@ class MainActivity : AppCompatActivity() {
         binding.etCommandInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) { sendTyped(); true } else false
         }
-        binding.btnSettings.setOnClickListener { performHaptic(); showSettings() }
-        binding.btnNotification.setOnClickListener { performHaptic(); showHistoryDialog() }
+        binding.btnSettings.setOnClickListener { performHaptic(); updateNavSelection(4) }
+
+        // Quick Action Pills below reactor
+        binding.pillOpenApps.setOnClickListener { performHaptic(); viewModel.submit("open apps") }
+        binding.pillSystemInfo.setOnClickListener { performHaptic(); viewModel.submit("battery status") }
+        binding.pillMore.setOnClickListener {
+            performHaptic()
+            binding.gridControlDeck.visibility = View.VISIBLE
+            updateControlDeckUI()
+        }
     }
 
     private fun setupControlDeck() {
+        val toggleExpand = {
+            performHaptic()
+            if (binding.gridControlDeck.visibility == View.VISIBLE) {
+                binding.gridControlDeck.visibility = View.GONE
+            } else {
+                binding.gridControlDeck.visibility = View.VISIBLE
+            }
+            updateControlDeckUI()
+        }
+
+        binding.tvDeckSectionTitle.setOnClickListener { toggleExpand() }
+
         binding.btnPrevSection.setOnClickListener {
             performHaptic()
             deckSectionIndex = if (deckSectionIndex > 0) deckSectionIndex - 1 else deckSections.size - 1
+            binding.gridControlDeck.visibility = View.VISIBLE
             updateControlDeckUI()
         }
 
         binding.btnNextSection.setOnClickListener {
             performHaptic()
             deckSectionIndex = (deckSectionIndex + 1) % deckSections.size
+            binding.gridControlDeck.visibility = View.VISIBLE
             updateControlDeckUI()
         }
 
@@ -128,7 +152,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateControlDeckUI() {
-        binding.tvDeckSectionTitle.text = deckSections[deckSectionIndex]
+        val isExpanded = binding.gridControlDeck.visibility == View.VISIBLE
+        val arrow = if (isExpanded) "▲" else "▼"
+        binding.tvDeckSectionTitle.text = "${deckSections[deckSectionIndex]} $arrow"
 
         when (deckSectionIndex) {
             0 -> { // QUICK ACTIONS
@@ -148,7 +174,7 @@ class MainActivity : AppCompatActivity() {
                 binding.btnDeckAction5.setOnClickListener { performHaptic(); viewModel.setPcMode(!binding.switchPcMode.isChecked) }
 
                 binding.btnDeckAction6.text = "More Actions"
-                binding.btnDeckAction6.setOnClickListener { performHaptic(); showTabManagerDialog() }
+                binding.btnDeckAction6.setOnClickListener { performHaptic(); updateNavSelection(1) }
             }
             1 -> { // SYSTEM COMMANDS
                 binding.btnDeckAction1.text = "Toggle Torch"
@@ -180,7 +206,7 @@ class MainActivity : AppCompatActivity() {
                 binding.btnDeckAction3.setOnClickListener { performHaptic(); viewModel.submit("take screenshot") }
 
                 binding.btnDeckAction4.text = "Media History"
-                binding.btnDeckAction4.setOnClickListener { performHaptic(); showHistoryDialog() }
+                binding.btnDeckAction4.setOnClickListener { performHaptic(); updateNavSelection(3) }
 
                 binding.btnDeckAction5.text = "Pause Media"
                 binding.btnDeckAction5.setOnClickListener { performHaptic(); viewModel.submit("pause music") }
@@ -195,30 +221,27 @@ class MainActivity : AppCompatActivity() {
         binding.navHome.setOnClickListener {
             performHaptic()
             updateNavSelection(0)
-            binding.mainScrollView.smoothScrollTo(0, 0)
         }
 
         binding.navTabs.setOnClickListener {
             performHaptic()
             updateNavSelection(1)
-            showTabManagerDialog()
         }
 
         binding.navCentralReactorBtn.setOnClickListener {
             performHaptic()
+            updateNavSelection(0)
             listen()
         }
 
         binding.navHistory.setOnClickListener {
             performHaptic()
             updateNavSelection(3)
-            showHistoryDialog()
         }
 
         binding.navSettings.setOnClickListener {
             performHaptic()
             updateNavSelection(4)
-            showSettings()
         }
     }
 
@@ -237,85 +260,64 @@ class MainActivity : AppCompatActivity() {
 
         binding.ivNavSettings.setColorFilter(if (index == 4) selectedColor else unselectedColor)
         binding.tvNavSettings.setTextColor(if (index == 4) selectedColor else unselectedColor)
-    }
 
-    private fun setupTabPreview() {
-        updateTabPreviewUI()
+        // Switch active page view
+        binding.homeViewLayout.visibility = if (index == 0) View.VISIBLE else View.GONE
+        binding.tabsViewLayout.visibility = if (index == 1) View.VISIBLE else View.GONE
+        binding.historyViewLayout.visibility = if (index == 3) View.VISIBLE else View.GONE
+        binding.settingsViewLayout.visibility = if (index == 4) View.VISIBLE else View.GONE
 
-        binding.btnViewAllTabs.setOnClickListener {
-            performHaptic()
-            showTabManagerDialog()
-        }
-
-        binding.btnCloseTab1.setOnClickListener {
-            performHaptic()
-            if (activeTabsList.isNotEmpty()) activeTabsList.removeAt(0)
-            updateTabPreviewUI()
-        }
-
-        binding.btnCloseTab2.setOnClickListener {
-            performHaptic()
-            if (activeTabsList.size > 1) activeTabsList.removeAt(1)
-            else if (activeTabsList.isNotEmpty()) activeTabsList.removeAt(0)
-            updateTabPreviewUI()
+        if (index == 0) {
+            binding.homeViewLayout.smoothScrollTo(0, 0)
         }
     }
 
-    private fun updateTabPreviewUI() {
-        binding.tvActiveTabsCount.text = "ACTIVE TABS (${activeTabsList.size})"
-        if (activeTabsList.isEmpty()) {
-            binding.cardActiveTabs.visibility = View.GONE
-        } else {
-            binding.cardActiveTabs.visibility = View.VISIBLE
-            binding.cardTab1.visibility = if (activeTabsList.size >= 1) View.VISIBLE else View.GONE
-            binding.cardTab2.visibility = if (activeTabsList.size >= 2) View.VISIBLE else View.GONE
-        }
-    }
-
-    private fun showTabManagerDialog() {
-        val dialogView = layoutInflater.inflate(R.layout.dialog_tab_manager, null)
-        val rvList = dialogView.findViewById<RecyclerView>(R.id.rvTabList)
-        val btnCloseAll = dialogView.findViewById<View>(R.id.btnCloseAllTabs)
-        val btnDone = dialogView.findViewById<View>(R.id.btnTabDialogClose)
-
-        val adapter = TabAdapter(
+    private fun setupTabsScreen() {
+        tabAdapter = TabAdapter(
             activeTabsList,
             onTabClick = { tab ->
+                performHaptic()
                 viewModel.submit("open ${tab.title}")
             },
             onTabClose = { tab ->
+                performHaptic()
                 activeTabsList.remove(tab)
-                updateTabPreviewUI()
+                tabAdapter.updateTabs(activeTabsList)
             }
         )
 
-        rvList.layoutManager = LinearLayoutManager(this)
-        rvList.adapter = adapter
+        binding.rvTabCards.layoutManager = LinearLayoutManager(this)
+        binding.rvTabCards.adapter = tabAdapter
 
-        val dialog = MaterialAlertDialogBuilder(this)
-            .setView(dialogView)
-            .create()
-
-        btnCloseAll.setOnClickListener {
+        binding.btnMainCloseAllTabs.setOnClickListener {
             performHaptic()
             activeTabsList.clear()
-            adapter.updateTabs(emptyList())
-            updateTabPreviewUI()
+            tabAdapter.updateTabs(emptyList())
         }
 
-        btnDone.setOnClickListener {
-            dialog.dismiss()
+        binding.btnAddTab.setOnClickListener {
+            performHaptic()
+            val newId = (activeTabsList.size + 1).toString()
+            activeTabsList.add(BrowserTab(newId, "New Tab", "www.google.com", R.drawable.ic_search))
+            tabAdapter.updateTabs(activeTabsList)
         }
-
-        dialog.show()
     }
 
-    private fun showHistoryDialog() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("J.A.R.V.I.S. Command History")
-            .setMessage(binding.tvResponseText.text)
-            .setPositiveButton("OK", null)
-            .show()
+    private fun setupSettingsScreen() {
+        binding.btnOpenFullSettings.setOnClickListener {
+            performHaptic()
+            showSettings()
+        }
+
+        binding.setRowVoiceLanguage.setOnClickListener {
+            performHaptic()
+            Toast.makeText(this, "Voice Language: Marathi & English auto-detect", Toast.LENGTH_SHORT).show()
+        }
+
+        binding.setRowWakeWord.setOnClickListener {
+            performHaptic()
+            Toast.makeText(this, "Offline Wake Word: 'Hey Jarvis' active", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun listen() {
@@ -353,22 +355,27 @@ class MainActivity : AppCompatActivity() {
         binding.reactorView.setReactorState(reactorState)
         binding.reactorView.setAudioRms(s.audioRms)
 
+        // Show Robot Avatar inside Arc Reactor when processing / busy
+        binding.reactorView.showRobotAvatar = s.busy
+
         // Reply text update
         val executed = s.lastAction?.takeIf { it.isNotBlank() && it != s.reply }
-        binding.tvResponseText.text = if (executed != null) "${s.reply}\n\n⚙ $executed" else s.reply
+        val latestReply = if (executed != null) "${s.reply}\n\n⚙ $executed" else s.reply
+        binding.tvResponseText.text = latestReply
+        binding.tvHistoryLog.text = "• Latest Response:\n$latestReply\n\n• Status: ${if (s.busy) "Processing" else "Ready"}"
 
         binding.tvAssistantStatus.text = when {
             s.busy -> s.note ?: "Processing command..."
             s.mode == Mode.COMMAND -> "Listening..."
             !s.note.isNullOrBlank() -> s.note
-            s.mode == Mode.WAKE -> "Listening for \"Hey Jarvis\"..."
-            else -> "Ready."
+            s.mode == Mode.WAKE -> "Tap to Speak"
+            else -> "Tap to Speak"
         }
 
         val (label, color) = when (s.connection) {
             Connection.PHONE_READY -> "PHONE READY" to "#00E676"
             Connection.NO_AI -> "NO AI KEY" to "#FFB300"
-            Connection.PC_ONLINE -> "Connected\nPC Online" to "#00E5FF"
+            Connection.PC_ONLINE -> "Connected • PC Online" to "#00E5FF"
             Connection.PC_OFFLINE -> "PC Offline" to "#FF5252"
         }
         binding.tvConnectionStatus.text = label

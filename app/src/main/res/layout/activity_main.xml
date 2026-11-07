@@ -35,15 +35,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_glass_card_active"
-            android:drawablePadding="6dp"
             android:paddingHorizontal="12dp"
             android:paddingVertical="6dp"
-            android:text="Connected\nPC Online"
+            android:text="Connected • PC Online"
             android:textColor="#00E676"
             android:textSize="11sp"
-            android:textStyle="bold"
-            app:drawableStartCompat="@android:drawable/ic_menu_compass"
-            app:drawableTint="#00E676" />
+            android:textStyle="bold" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -80,16 +77,6 @@
             android:textSize="11sp" />
 
         <ImageButton
-            android:id="@+id/btnNotification"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
-            android:layout_marginStart="4dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Notifications"
-            android:src="@drawable/ic_bell"
-            app:tint="#00E5FF" />
-
-        <ImageButton
             android:id="@+id/btnSettings"
             android:layout_width="38dp"
             android:layout_height="38dp"
@@ -99,607 +86,792 @@
             app:tint="#00E5FF" />
     </LinearLayout>
 
-    <ScrollView
-        android:id="@+id/mainScrollView"
+    <!-- CONTENT VIEWS CONTAINER -->
+    <FrameLayout
+        android:id="@+id/mainContentContainer"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:fillViewport="true"
-        android:scrollbars="none"
         app:layout_constraintBottom_toTopOf="@+id/bottomNavLayout"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/topBarLayout">
 
-        <LinearLayout
+        <!-- 1. HOME SCREEN VIEW -->
+        <ScrollView
+            android:id="@+id/homeViewLayout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:orientation="vertical"
-            android:paddingHorizontal="16dp"
-            android:paddingBottom="16dp">
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:scrollbars="none">
 
-            <!-- CENTRAL HOLOGRAPHIC ARC REACTOR 2.0 -->
-            <FrameLayout
-                android:id="@+id/reactorContainer"
-                android:layout_width="260dp"
-                android:layout_height="260dp"
-                android:layout_marginTop="4dp">
-
-                <com.jarvis.assistant.ui.JarvisReactorView
-                    android:id="@+id/reactorView"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
-
-                <!-- Legacy ImageViews hidden or kept for backwards safety -->
-                <ImageView
-                    android:id="@+id/ivReactorOuterRing"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:visibility="gone"
-                    tools:ignore="ContentDescription" />
-
-                <ImageView
-                    android:id="@+id/ivReactorCore"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:visibility="gone"
-                    tools:ignore="ContentDescription" />
-            </FrameLayout>
-
-            <!-- STATUS BAR WITH LIVE PULSE -->
             <LinearLayout
-                android:id="@+id/statusPillLayout"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_glass_card"
-                android:gravity="center"
-                android:orientation="horizontal"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
                 android:paddingHorizontal="16dp"
-                android:paddingVertical="8dp">
+                android:paddingBottom="16dp">
 
-                <ImageView
-                    android:id="@+id/ivStatusWave"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:layout_marginEnd="8dp"
-                    android:src="@drawable/ic_wave_visualizer"
-                    app:tint="#00E676" />
+                <!-- CENTRAL HOLOGRAPHIC ARC REACTOR (MAIN PRIORITY DISPLAY) -->
+                <FrameLayout
+                    android:id="@+id/reactorContainer"
+                    android:layout_width="310dp"
+                    android:layout_height="310dp"
+                    android:layout_marginTop="2dp">
 
-                <TextView
-                    android:id="@+id/tvAssistantStatus"
+                    <com.jarvis.assistant.ui.JarvisReactorView
+                        android:id="@+id/reactorView"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent" />
+
+                    <!-- Legacy ImageViews for safety -->
+                    <ImageView
+                        android:id="@+id/ivReactorOuterRing"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:visibility="gone"
+                        tools:ignore="ContentDescription" />
+
+                    <ImageView
+                        android:id="@+id/ivReactorCore"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone"
+                        tools:ignore="ContentDescription" />
+                </FrameLayout>
+
+                <!-- SINGLE STATUS PILL -->
+                <LinearLayout
+                    android:id="@+id/statusPillLayout"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:letterSpacing="0.05"
-                    android:text="Say &quot;Hey Jarvis&quot;..."
-                    android:textColor="#00E5FF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <!-- METRICS HUD CARD (BATTERY, CPU, RAM) -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardMetrics"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                app:cardBackgroundColor="#800A1628"
-                app:cardCornerRadius="16dp"
-                app:strokeColor="#1A3A5E"
-                app:strokeWidth="1.5dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_glass_card"
+                    android:gravity="center"
                     android:orientation="horizontal"
                     android:paddingHorizontal="12dp"
-                    android:paddingVertical="12dp">
+                    android:paddingVertical="4dp">
 
-                    <LinearLayout
-                        android:layout_width="0dp"
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginEnd="6dp"
+                        android:contentDescription="Status Wave"
+                        android:src="@drawable/ic_wave_visualizer"
+                        app:tint="#4DD0E1" />
+
+                    <TextView
+                        android:id="@+id/tvAssistantStatus"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/tvCpuMetric"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="93%"
-                            android:textColor="#00E676"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Battery"
-                            android:textColor="#90CAF9"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="1dp"
-                        android:layout_height="match_parent"
-                        android:background="#1A3A5E" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/tvRamMetric"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="23%"
-                            android:textColor="#00E5FF"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="CPU"
-                            android:textColor="#90CAF9"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="1dp"
-                        android:layout_height="match_parent"
-                        android:background="#1A3A5E" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/tvDiskMetric"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="67%"
-                            android:textColor="#E040FB"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="RAM"
-                            android:textColor="#90CAF9"
-                            android:textSize="11sp" />
-                    </LinearLayout>
+                        android:letterSpacing="0.05"
+                        android:text="Tap to Speak"
+                        android:textColor="#00E5FF"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
 
-            <!-- EXPANDABLE CONTROL DECK PANEL -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardControlDeck"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                app:cardBackgroundColor="#800A1628"
-                app:cardCornerRadius="16dp"
-                app:strokeColor="#00E5FF"
-                app:strokeWidth="1.5dp">
-
+                <!-- QUICK ACTION PILLS (Open Apps | System Info | More) -->
                 <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/pillOpenApps"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/bg_glass_card"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="4dp"
+                        android:text="Open Apps"
+                        android:textColor="#00E5FF"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/pillSystemInfo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/bg_glass_card"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="4dp"
+                        android:text="System Info"
+                        android:textColor="#00E5FF"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/pillMore"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_glass_card"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="4dp"
+                        android:text="More v"
+                        android:textColor="#00E5FF"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- METRICS HUD CARD (COMPACT) -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardMetrics"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="12dp">
+                    android:layout_marginTop="8dp"
+                    app:cardBackgroundColor="#800A1628"
+                    app:cardCornerRadius="12dp"
+                    app:strokeColor="#1A3A5E"
+                    app:strokeWidth="1dp">
 
-                    <!-- SECTION SELECTOR HEADER (<< QUICK ACTIONS >>) -->
                     <LinearLayout
-                        android:id="@+id/deckHeaderLayout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="center"
                         android:orientation="horizontal"
-                        android:paddingVertical="4dp">
+                        android:paddingHorizontal="8dp"
+                        android:paddingVertical="6dp">
 
-                        <TextView
-                            android:id="@+id/btnPrevSection"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:padding="8dp"
-                            android:text="&lt;&lt;"
-                            android:textColor="#00E5FF"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvDeckSectionTitle"
+                        <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:gravity="center"
-                            android:letterSpacing="0.15"
-                            android:text="QUICK ACTIONS"
-                            android:textColor="#FFFFFF"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
+                            android:orientation="vertical">
 
-                        <TextView
-                            android:id="@+id/btnNextSection"
-                            android:layout_width="wrap_content"
+                            <TextView
+                                android:id="@+id/tvCpuMetric"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="93%"
+                                android:textColor="#00E676"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Battery"
+                                android:textColor="#90CAF9"
+                                android:textSize="10sp" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="match_parent"
+                            android:background="#1A3A5E" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:padding="8dp"
-                            android:text="&gt;&gt;"
-                            android:textColor="#00E5FF"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="vertical">
 
-                    <!-- GRID BUTTONS SECTION -->
-                    <GridLayout
-                        android:id="@+id/gridControlDeck"
+                            <TextView
+                                android:id="@+id/tvRamMetric"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="23%"
+                                android:textColor="#00E5FF"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="CPU"
+                                android:textColor="#90CAF9"
+                                android:textSize="10sp" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="match_parent"
+                            android:background="#1A3A5E" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvDiskMetric"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="67%"
+                                android:textColor="#E040FB"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="RAM"
+                                android:textColor="#90CAF9"
+                                android:textSize="10sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- EXPANDABLE CONTROL DECK PANEL (COMPACT) -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardControlDeck"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    app:cardBackgroundColor="#800A1628"
+                    app:cardCornerRadius="12dp"
+                    app:strokeColor="#00E5FF"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:columnCount="2"
-                        android:rowCount="3">
+                        android:orientation="vertical"
+                        android:padding="8dp">
+
+                        <LinearLayout
+                            android:id="@+id/deckHeaderLayout"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:orientation="horizontal"
+                            android:paddingVertical="2dp">
+
+                            <TextView
+                                android:id="@+id/btnPrevSection"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:padding="6dp"
+                                android:text="&lt;&lt;"
+                                android:textColor="#00E5FF"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvDeckSectionTitle"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:letterSpacing="0.12"
+                                android:text="QUICK ACTIONS ▼"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/btnNextSection"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:padding="6dp"
+                                android:text="&gt;&gt;"
+                                android:textColor="#00E5FF"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <GridLayout
+                            android:id="@+id/gridControlDeck"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:columnCount="2"
+                            android:rowCount="3"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:id="@+id/btnDeckAction1"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="3dp"
+                                android:background="@drawable/bg_quick_action_btn"
+                                android:drawablePadding="8dp"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="10dp"
+                                android:text="Open Apps"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                app:drawableStartCompat="@drawable/ic_apps"
+                                app:drawableTint="#00E5FF" />
+
+                            <TextView
+                                android:id="@+id/btnDeckAction2"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="3dp"
+                                android:background="@drawable/bg_quick_action_btn"
+                                android:drawablePadding="8dp"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="10dp"
+                                android:text="Search Web"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                app:drawableStartCompat="@drawable/ic_search"
+                                app:drawableTint="#00E5FF" />
+
+                            <TextView
+                                android:id="@+id/btnDeckAction3"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="3dp"
+                                android:background="@drawable/bg_quick_action_btn"
+                                android:drawablePadding="8dp"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="10dp"
+                                android:text="Open YouTube"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                app:drawableStartCompat="@drawable/ic_youtube" />
+
+                            <TextView
+                                android:id="@+id/btnDeckAction4"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="3dp"
+                                android:background="@drawable/bg_quick_action_btn"
+                                android:drawablePadding="8dp"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="10dp"
+                                android:text="Play Music"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                app:drawableStartCompat="@drawable/ic_spotify"
+                                app:drawableTint="#00E5FF" />
+
+                            <TextView
+                                android:id="@+id/btnDeckAction5"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="3dp"
+                                android:background="@drawable/bg_quick_action_btn"
+                                android:drawablePadding="8dp"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="10dp"
+                                android:text="PC Control"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                app:drawableStartCompat="@drawable/ic_pc"
+                                app:drawableTint="#00E5FF" />
+
+                            <TextView
+                                android:id="@+id/btnDeckAction6"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_columnWeight="1"
+                                android:layout_margin="3dp"
+                                android:background="@drawable/bg_quick_action_btn"
+                                android:drawablePadding="8dp"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="10dp"
+                                android:text="More Actions"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                app:drawableStartCompat="@drawable/ic_tabs"
+                                app:drawableTint="#00E5FF" />
+                        </GridLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- J.A.R.V.I.S. RESPONSE CARD (COMPACT 56dp) -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardResponse"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    app:cardBackgroundColor="#800A1628"
+                    app:cardCornerRadius="12dp"
+                    app:strokeColor="#1A3A5E"
+                    app:strokeWidth="1dp">
+
+                    <ScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp">
 
                         <TextView
-                            android:id="@+id/btnDeckAction1"
-                            android:layout_width="0dp"
-                            android:layout_height="46dp"
-                            android:layout_columnWeight="1"
-                            android:layout_margin="4dp"
-                            android:background="@drawable/bg_quick_action_btn"
-                            android:drawableStart="@drawable/ic_apps"
-                            android:drawablePadding="10dp"
-                            android:drawableTint="#00E5FF"
-                            android:gravity="center_vertical"
-                            android:paddingHorizontal="14dp"
-                            android:text="Open Apps"
+                            android:id="@+id/tvResponseText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:lineSpacingExtra="2dp"
+                            android:padding="10dp"
+                            android:text="J.A.R.V.I.S. is online and ready. How may I assist you, sir?"
                             android:textColor="#FFFFFF"
                             android:textSize="12sp" />
+                    </ScrollView>
+                </com.google.android.material.card.MaterialCardView>
 
-                        <TextView
-                            android:id="@+id/btnDeckAction2"
-                            android:layout_width="0dp"
-                            android:layout_height="46dp"
-                            android:layout_columnWeight="1"
-                            android:layout_margin="4dp"
-                            android:background="@drawable/bg_quick_action_btn"
-                            android:drawableStart="@drawable/ic_search"
-                            android:drawablePadding="10dp"
-                            android:drawableTint="#00E5FF"
-                            android:gravity="center_vertical"
-                            android:paddingHorizontal="14dp"
-                            android:text="Search Web"
-                            android:textColor="#FFFFFF"
-                            android:textSize="12sp" />
+                <!-- COMMAND INPUT BAR (COMPACT 40dp) -->
+                <LinearLayout
+                    android:id="@+id/bottomInputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                        <TextView
-                            android:id="@+id/btnDeckAction3"
-                            android:layout_width="0dp"
-                            android:layout_height="46dp"
-                            android:layout_columnWeight="1"
-                            android:layout_margin="4dp"
-                            android:background="@drawable/bg_quick_action_btn"
-                            android:drawableStart="@drawable/ic_youtube"
-                            android:drawablePadding="10dp"
-                            android:gravity="center_vertical"
-                            android:paddingHorizontal="14dp"
-                            android:text="Open YouTube"
-                            android:textColor="#FFFFFF"
-                            android:textSize="12sp" />
+                    <EditText
+                        android:id="@+id/etCommandInput"
+                        android:layout_width="0dp"
+                        android:layout_height="42dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_glass_card"
+                        android:hint="Say something..."
+                        android:imeOptions="actionSend"
+                        android:inputType="text"
+                        android:paddingHorizontal="14dp"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#546E7A"
+                        android:textSize="12sp" />
 
-                        <TextView
-                            android:id="@+id/btnDeckAction4"
-                            android:layout_width="0dp"
-                            android:layout_height="46dp"
-                            android:layout_columnWeight="1"
-                            android:layout_margin="4dp"
-                            android:background="@drawable/bg_quick_action_btn"
-                            android:drawableStart="@drawable/ic_spotify"
-                            android:drawablePadding="10dp"
-                            android:drawableTint="#00E5FF"
-                            android:gravity="center_vertical"
-                            android:paddingHorizontal="14dp"
-                            android:text="Play Music"
-                            android:textColor="#FFFFFF"
-                            android:textSize="12sp" />
+                    <ImageButton
+                        android:id="@+id/btnMicToggle"
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_quick_action_btn"
+                        android:contentDescription="Speak"
+                        android:src="@drawable/ic_mic"
+                        app:tint="#00E5FF" />
 
-                        <TextView
-                            android:id="@+id/btnDeckAction5"
-                            android:layout_width="0dp"
-                            android:layout_height="46dp"
-                            android:layout_columnWeight="1"
-                            android:layout_margin="4dp"
-                            android:background="@drawable/bg_quick_action_btn"
-                            android:drawableStart="@drawable/ic_pc"
-                            android:drawablePadding="10dp"
-                            android:drawableTint="#00E5FF"
-                            android:gravity="center_vertical"
-                            android:paddingHorizontal="14dp"
-                            android:text="PC Control"
-                            android:textColor="#FFFFFF"
-                            android:textSize="12sp" />
-
-                        <TextView
-                            android:id="@+id/btnDeckAction6"
-                            android:layout_width="0dp"
-                            android:layout_height="46dp"
-                            android:layout_columnWeight="1"
-                            android:layout_margin="4dp"
-                            android:background="@drawable/bg_quick_action_btn"
-                            android:drawableStart="@drawable/ic_tabs"
-                            android:drawablePadding="10dp"
-                            android:drawableTint="#00E5FF"
-                            android:gravity="center_vertical"
-                            android:paddingHorizontal="14dp"
-                            android:text="More Actions"
-                            android:textColor="#FFFFFF"
-                            android:textSize="12sp" />
-                    </GridLayout>
+                    <ImageButton
+                        android:id="@+id/btnSend"
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_reactor_center_btn"
+                        android:contentDescription="Send"
+                        android:src="@drawable/ic_send"
+                        app:tint="#050B14" />
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
 
-            <!-- ACTIVE BROWSER TABS CARD -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardActiveTabs"
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- 2. TABS SCREEN VIEW (SCREEN 4 IN REFERENCE IMAGE) -->
+        <LinearLayout
+            android:id="@+id/tabsViewLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <!-- TAB PILL HEADER -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                app:cardBackgroundColor="#800A1628"
-                app:cardCornerRadius="16dp"
-                app:strokeColor="#1A3A5E"
-                app:strokeWidth="1.5dp">
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingBottom="12dp">
 
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_glass_card_active"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="8dp"
+                    android:text="Home"
+                    android:textColor="#00E5FF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_glass_card"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="8dp"
+                    android:text="YouTube"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/btnAddTab"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_glass_card"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="8dp"
+                    android:text="+"
+                    android:textColor="#00E5FF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- RECYCLER VIEW TAB CARDS -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvTabCards"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clipToPadding="false" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMainCloseAllTabs"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="#0E223D"
+                android:text="🗑️ Close All"
+                android:textColor="#FF5252"
+                app:cornerRadius="12dp"
+                app:strokeColor="#FF5252"
+                app:strokeWidth="1dp" />
+        </LinearLayout>
+
+        <!-- 3. HISTORY SCREEN VIEW -->
+        <LinearLayout
+            android:id="@+id/historyViewLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.15"
+                android:text="COMMAND HISTORY"
+                android:textColor="#00E5FF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="12dp">
+
+                <TextView
+                    android:id="@+id/tvHistoryLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_glass_card"
+                    android:lineSpacingExtra="6dp"
+                    android:padding="16dp"
+                    android:text="• Initialized J.A.R.V.I.S. Core 3.0\n• System Online\n• Waiting for voice command..."
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp" />
+            </ScrollView>
+        </LinearLayout>
+
+        <!-- 4. SETTINGS SCREEN VIEW (SCREEN 5 IN REFERENCE IMAGE) -->
+        <ScrollView
+            android:id="@+id/settingsViewLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <!-- SETTINGS HEADER PROFILE AVATAR -->
+                <FrameLayout
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:background="@drawable/bg_reactor_center_btn">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="J"
+                        android:textColor="#050B14"
+                        android:textSize="32sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:letterSpacing="0.15"
+                    android:text="J.A.R.V.I.S."
+                    android:textColor="#00E5FF"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="v2.0.0"
+                    android:textColor="#90CAF9"
+                    android:textSize="11sp" />
+
+                <!-- GLASS SETTINGS LIST -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:background="@drawable/bg_glass_card"
                     android:orientation="vertical"
                     android:padding="12dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+                        android:layout_height="52dp"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
 
                         <TextView
-                            android:id="@+id/tvActiveTabsCount"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:drawableStart="@drawable/ic_tabs"
-                            android:drawablePadding="8dp"
-                            android:drawableTint="#00E5FF"
-                            android:letterSpacing="0.1"
-                            android:text="ACTIVE TABS (2)"
-                            android:textColor="#00E5FF"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
+                            android:text="🎙️ Background Mic"
+                            android:textColor="#FFFFFF"
+                            android:textSize="13sp" />
 
-                        <TextView
-                            android:id="@+id/btnViewAllTabs"
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/setSwitchBgMic"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:padding="4dp"
-                            android:text="View All -&gt;"
-                            android:textColor="#90CAF9"
+                            android:checked="true" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#1A3A5E" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🌐 Browser Mic"
+                            android:textColor="#FFFFFF"
+                            android:textSize="13sp" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/setSwitchBrowserMic"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#1A3A5E" />
+
+                    <LinearLayout
+                        android:id="@+id/setRowVoiceLanguage"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🗣️ Voice Language"
+                            android:textColor="#FFFFFF"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tvSetVoiceLang"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Marathi (mr-IN) v"
+                            android:textColor="#00E5FF"
                             android:textSize="12sp" />
                     </LinearLayout>
 
-                    <LinearLayout
-                        android:id="@+id/tabsPreviewContainer"
+                    <View
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_height="1dp"
+                        android:background="#1A3A5E" />
+
+                    <LinearLayout
+                        android:id="@+id/setRowWakeWord"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
                         android:orientation="horizontal">
 
-                        <!-- Tab Card 1 -->
-                        <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/cardTab1"
+                        <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="6dp"
                             android:layout_weight="1"
-                            app:cardBackgroundColor="#0D1E36"
-                            app:cardCornerRadius="12dp"
-                            app:strokeColor="#00E5FF"
-                            app:strokeWidth="1dp">
+                            android:text="⚡ Wake Word"
+                            android:textColor="#FFFFFF"
+                            android:textSize="13sp" />
 
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal"
-                                android:padding="10dp">
-
-                                <ImageView
-                                    android:layout_width="20dp"
-                                    android:layout_height="20dp"
-                                    android:src="@drawable/ic_search"
-                                    app:tint="#00E5FF" />
-
-                                <LinearLayout
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="8dp"
-                                    android:layout_weight="1"
-                                    android:orientation="vertical">
-
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:ellipsize="end"
-                                        android:maxLines="1"
-                                        android:text="Google"
-                                        android:textColor="#FFFFFF"
-                                        android:textSize="12sp"
-                                        android:textStyle="bold" />
-
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:ellipsize="end"
-                                        android:maxLines="1"
-                                        android:text="www.google.com"
-                                        android:textColor="#90CAF9"
-                                        android:textSize="10sp" />
-                                </LinearLayout>
-
-                                <ImageButton
-                                    android:id="@+id/btnCloseTab1"
-                                    android:layout_width="24dp"
-                                    android:layout_height="24dp"
-                                    android:background="?attr/selectableItemBackgroundBorderless"
-                                    android:src="@drawable/ic_close"
-                                    app:tint="#90CAF9" />
-                            </LinearLayout>
-                        </com.google.android.material.card.MaterialCardView>
-
-                        <!-- Tab Card 2 -->
-                        <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/cardTab2"
-                            android:layout_width="0dp"
+                        <TextView
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:layout_weight="1"
-                            app:cardBackgroundColor="#0D1E36"
-                            app:cardCornerRadius="12dp"
-                            app:strokeColor="#1A3A5E"
-                            app:strokeWidth="1dp">
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal"
-                                android:padding="10dp">
-
-                                <ImageView
-                                    android:layout_width="20dp"
-                                    android:layout_height="20dp"
-                                    android:src="@drawable/ic_youtube" />
-
-                                <LinearLayout
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="8dp"
-                                    android:layout_weight="1"
-                                    android:orientation="vertical">
-
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:ellipsize="end"
-                                        android:maxLines="1"
-                                        android:text="YouTube"
-                                        android:textColor="#FFFFFF"
-                                        android:textSize="12sp"
-                                        android:textStyle="bold" />
-
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:ellipsize="end"
-                                        android:maxLines="1"
-                                        android:text="m.youtube.com"
-                                        android:textColor="#90CAF9"
-                                        android:textSize="10sp" />
-                                </LinearLayout>
-
-                                <ImageButton
-                                    android:id="@+id/btnCloseTab2"
-                                    android:layout_width="24dp"
-                                    android:layout_height="24dp"
-                                    android:background="?attr/selectableItemBackgroundBorderless"
-                                    android:src="@drawable/ic_close"
-                                    app:tint="#90CAF9" />
-                            </LinearLayout>
-                        </com.google.android.material.card.MaterialCardView>
+                            android:text="Hey Jarvis v"
+                            android:textColor="#00E5FF"
+                            android:textSize="12sp" />
                     </LinearLayout>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
 
-            <!-- J.A.R.V.I.S. RESPONSE CARD -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardResponse"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                app:cardBackgroundColor="#800A1628"
-                app:cardCornerRadius="16dp"
-                app:strokeColor="#1A3A5E"
-                app:strokeWidth="1.5dp">
-
-                <ScrollView
-                    android:layout_width="match_parent"
-                    android:layout_height="100dp">
-
-                    <TextView
-                        android:id="@+id/tvResponseText"
+                    <View
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:lineSpacingExtra="4dp"
-                        android:padding="14dp"
-                        android:text="J.A.R.V.I.S. is online and ready. How may I assist you, sir?"
-                        android:textColor="#FFFFFF"
-                        android:textSize="13sp" />
-                </ScrollView>
-            </com.google.android.material.card.MaterialCardView>
+                        android:layout_height="1dp"
+                        android:background="#1A3A5E" />
 
-            <!-- COMMAND INPUT FIELD BAR -->
-            <LinearLayout
-                android:id="@+id/bottomInputLayout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                <EditText
-                    android:id="@+id/etCommandInput"
-                    android:layout_width="0dp"
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🎨 Animations"
+                            android:textColor="#FFFFFF"
+                            android:textSize="13sp" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/setSwitchAnimations"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOpenFullSettings"
+                    android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_glass_card"
-                    android:hint="Type or speak a command..."
-                    android:imeOptions="actionSend"
-                    android:inputType="text"
-                    android:paddingHorizontal="16dp"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#546E7A"
-                    android:textSize="13sp" />
+                    android:layout_marginTop="20dp"
+                    android:backgroundTint="#0E223D"
+                    android:text="⚙️ Advanced AI Keys &amp; System Permissions"
+                    android:textColor="#00E5FF"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="#00E5FF"
+                    app:strokeWidth="1dp" />
 
-                <ImageButton
-                    android:id="@+id/btnMicToggle"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="8dp"
-                    android:background="@drawable/bg_quick_action_btn"
-                    android:contentDescription="Speak"
-                    android:src="@drawable/ic_mic"
-                    app:tint="#00E5FF" />
-
-                <ImageButton
-                    android:id="@+id/btnSend"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="8dp"
-                    android:background="@drawable/bg_reactor_center_btn"
-                    android:contentDescription="Send"
-                    android:src="@drawable/ic_send"
-                    app:tint="#050B14" />
             </LinearLayout>
+        </ScrollView>
 
-        </LinearLayout>
-    </ScrollView>
+    </FrameLayout>
 
-    <!-- SCI-FI HOLOGRAPHIC BOTTOM NAVIGATION BAR -->
+    <!-- SCI-FI BOTTOM NAVIGATION BAR -->
     <LinearLayout
         android:id="@+id/bottomNavLayout"
         android:layout_width="0dp"
@@ -713,7 +885,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- NAV 1: HOME -->
         <LinearLayout
             android:id="@+id/navHome"
             android:layout_width="0dp"
@@ -728,6 +899,7 @@
                 android:id="@+id/ivNavHome"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
+                android:contentDescription="Home"
                 android:src="@drawable/ic_home"
                 app:tint="#00E5FF" />
 
@@ -742,7 +914,6 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- NAV 2: TABS -->
         <LinearLayout
             android:id="@+id/navTabs"
             android:layout_width="0dp"
@@ -757,6 +928,7 @@
                 android:id="@+id/ivNavTabs"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
+                android:contentDescription="Tabs"
                 android:src="@drawable/ic_tabs"
                 app:tint="#90CAF9" />
 
@@ -770,7 +942,6 @@
                 android:textSize="10sp" />
         </LinearLayout>
 
-        <!-- NAV 3: CENTRAL VOICE REACTOR PULSE BUTTON -->
         <FrameLayout
             android:id="@+id/navCentralReactorBtn"
             android:layout_width="56dp"
@@ -785,11 +956,11 @@
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:layout_gravity="center"
+                android:contentDescription="Reactor Voice"
                 android:src="@drawable/ic_wave_visualizer"
                 app:tint="#050B14" />
         </FrameLayout>
 
-        <!-- NAV 4: HISTORY -->
         <LinearLayout
             android:id="@+id/navHistory"
             android:layout_width="0dp"
@@ -804,6 +975,7 @@
                 android:id="@+id/ivNavHistory"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
+                android:contentDescription="History"
                 android:src="@drawable/ic_history"
                 app:tint="#90CAF9" />
 
@@ -817,7 +989,6 @@
                 android:textSize="10sp" />
         </LinearLayout>
 
-        <!-- NAV 5: SETTINGS -->
         <LinearLayout
             android:id="@+id/navSettings"
             android:layout_width="0dp"
@@ -832,6 +1003,7 @@
                 android:id="@+id/ivNavSettings"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
+                android:contentDescription="Settings"
                 android:src="@drawable/ic_settings"
                 app:tint="#90CAF9" />
 
