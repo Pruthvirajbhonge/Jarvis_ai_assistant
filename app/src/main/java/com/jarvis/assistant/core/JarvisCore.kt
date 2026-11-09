@@ -8,6 +8,7 @@ import android.os.BatteryManager
 import android.os.Environment
 import android.os.PowerManager
 import android.os.StatFs
+import com.jarvis.assistant.automation.BackgroundLauncher
 import com.jarvis.assistant.automation.PhoneActionExecutor
 import com.jarvis.assistant.automation.PhoneHardwareExecutor
 import com.jarvis.assistant.automation.UiAgent
@@ -90,6 +91,11 @@ class JarvisCore(private val app: Application) {
         }
         voice.onTranscript = { handleCommand(it) }
         voice.onError = { msg -> _state.update { it.copy(note = msg) } }
+        BackgroundLauncher.onBlocked = { label ->
+            val msg = "Android blocked opening $label in the background, sir. Tap the notification."
+            _state.update { it.copy(reply = msg, note = "Blocked: tap the notification to open $label") }
+            voice.speak(msg)
+        }
 
         // Mirror persisted settings into the UI state (works even before the service starts).
         scope.launch {

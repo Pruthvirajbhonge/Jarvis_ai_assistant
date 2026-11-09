@@ -15,6 +15,7 @@ import android.view.animation.LinearInterpolator
 import android.view.animation.RotateAnimation
 import android.widget.ImageView
 import com.jarvis.assistant.R
+import com.jarvis.assistant.core.AppState
 import kotlin.math.abs
 
 /** Draggable floating Arc Reactor (layout_floating_orb.xml). Tap = start listening. */
@@ -88,6 +89,7 @@ class FloatingOrbManager(
 
         wm.addView(v, params)
         view = v
+        AppState.overlayVisible = true
     }
 
     fun hide() {
@@ -95,5 +97,6 @@ class FloatingOrbManager(
             try { wm.removeView(it) } catch (e: Exception) {}
         }
         view = null
+        AppState.overlayVisible = false
     }
 }

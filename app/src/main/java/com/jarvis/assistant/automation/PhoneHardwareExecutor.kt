@@ -9,9 +9,11 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.net.Uri
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract.CommonDataKinds.Phone
+import android.telecom.TelecomManager
 import androidx.core.content.ContextCompat
 import com.jarvis.assistant.data.model.PhoneAction
 import kotlinx.serialization.json.buildJsonObject
@@ -259,13 +261,26 @@ class PhoneHardwareExecutor(context: Context) {
         }
 
         val canCall = has(Manifest.permission.CALL_PHONE)
+
+        // TelecomManager.placeCall works from the background (a plain startActivity does not).
+        if (canCall) {
+            try {
+                val telecom = app.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+                telecom.placeCall(Uri.fromParts("tel", number, null), Bundle())
+                return Outcome("Calling $display.", true)
+            } catch (e: SecurityException) {
+                // fall back to the intent below
+            } catch (e: Exception) {
+                // fall back to the intent below
+            }
+        }
         val intent = Intent(
             if (canCall) Intent.ACTION_CALL else Intent.ACTION_DIAL,
             Uri.fromParts("tel", number, null) // same as Uri.parse("tel:$number"), but safe for + * #
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         return try {
-            app.startActivity(intent)
+            BackgroundLauncher.start(app, intent, display)
             if (canCall) Outcome("Calling $display.", true)
             else Outcome("Opened the dialer for $display. Allow the Phone permission so I can call directly.", false)
         } catch (e: SecurityException) {
@@ -345,8 +360,7 @@ class PhoneHardwareExecutor(context: Context) {
         }
         return if (launch != null) {
             try {
-                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                app.startActivity(launch)
+                BackgroundLauncher.start(app, launch, name)
                 Outcome("Opening $name.", true)
             } catch (e: Exception) {
                 Outcome("Could not launch $name: ${e.message}", false)

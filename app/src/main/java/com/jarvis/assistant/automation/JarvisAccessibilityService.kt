@@ -25,7 +25,17 @@ class JarvisAccessibilityService : AccessibilityService() {
         Log.i("JarvisAccess", "Deep automation service connected.")
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+    /** Package of the app currently on screen (used to verify that an app really opened). */
+    @Volatile var foregroundPackage: String? = null
+        private set
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        val e = event ?: return
+        if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val pkg = e.packageName?.toString() ?: return
+        if (pkg == packageName || pkg == "com.android.systemui") return
+        foregroundPackage = pkg
+    }
     override fun onInterrupt() {}
 
     override fun onDestroy() {

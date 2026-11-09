@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import android.view.View
@@ -27,6 +28,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.jarvis.assistant.R
+import com.jarvis.assistant.automation.JarvisAccessibilityService
 import com.jarvis.assistant.core.Connection
 import com.jarvis.assistant.core.UiState
 import com.jarvis.assistant.data.model.BrowserTab
@@ -98,6 +100,50 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         startJarvisBackgroundService()
+        checkBackgroundSetup()
+    }
+
+    // ---- background setup (without these, voice commands only reply when the app is closed) ----
+
+    private val promptedSetup = mutableSetOf<String>()
+
+    private fun checkBackgroundSetup() {
+        if (!hasPermission(Manifest.permission.RECORD_AUDIO)) return
+        val pm = getSystemService(PowerManager::class.java)
+        when {
+            !Settings.canDrawOverlays(this) && promptedSetup.add("overlay") -> askSetup(
+                "Allow “Display over other apps”",
+                "Android blocks opening apps, maps, SMS and calls while Jarvis is in the background. " +
+                    "This permission lets Jarvis do them anyway. Keep the floating orb ON.\n\n" +
+                    "Xiaomi/Oppo/Vivo/Realme: also enable “Display pop-up windows while running in the background” " +
+                    "and Autostart in App info → Permissions.",
+                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+            )
+            JarvisAccessibilityService.instance == null && promptedSetup.add("accessibility") -> askSetup(
+                "Turn on Jarvis automation",
+                "Needed to tap buttons, type, send WhatsApp messages and to check that an app really opened. " +
+                    "Open Accessibility → Installed apps → J.A.R.V.I.S. → turn on.",
+                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            )
+            !pm.isIgnoringBatteryOptimizations(packageName) && promptedSetup.add("battery") -> askSetup(
+                "Keep Jarvis alive in the background",
+                "Without this Android may stop Jarvis when the screen is off.",
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
+            )
+        }
+    }
+
+    private fun askSetup(title: String, message: String, settingsIntent: Intent) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setNegativeButton("Later", null)
+            .setPositiveButton("Open settings") { _, _ ->
+                try { startActivity(settingsIntent) } catch (e: Exception) {
+                    Toast.makeText(this, "Open this setting manually from the Android settings.", Toast.LENGTH_LONG).show()
+                }
+            }
+            .show()
     }
 
     // ---- Click & Navigation Listeners --------------------------------------------------------
