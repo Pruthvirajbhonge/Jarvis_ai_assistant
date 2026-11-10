@@ -68,6 +68,7 @@ class PhoneHardwareExecutor(context: Context) {
         "torch", "flashlight", "flash" -> torch(a)
         "call", "dial" -> call(a)
         "open_app", "app", "open" -> openApp(a.str("app", "name", "package"))
+        "close_app", "close", "stop_app", "exit_app" -> closeApp(a.str("app", "name", "package"))
         else -> null
     }
 
@@ -77,7 +78,7 @@ class PhoneHardwareExecutor(context: Context) {
 
     fun interpret(raw: String): PhoneAction? {
         val t = normalize(raw)
-        return parseTorch(t) ?: parseVolume(t) ?: parseCall(raw.trim()) ?: parseAppLaunch(raw.trim())
+        return parseTorch(t) ?: parseVolume(t) ?: parseCall(raw.trim()) ?: parseCloseApp(raw.trim()) ?: parseAppLaunch(raw.trim())
     }
 
     /** Lower-cases and converts Devanagari digits (८०) to ASCII (80). */
@@ -324,11 +325,32 @@ class PhoneHardwareExecutor(context: Context) {
         ContextCompat.checkSelfPermission(app, permission) == PackageManager.PERMISSION_GRANTED
 
     // ================================================================================================
-    // APP LAUNCHING (Offline rule-based launch)
+    // APP LAUNCHING & CLOSING
     // ================================================================================================
+
+    private fun parseCloseApp(raw: String): PhoneAction? {
+        val t = raw.lowercase().trim()
+        if (!CLOSE_WORDS.containsMatchIn(t)) return null
+        val appName = when {
+            t.contains("whatsapp") -> "whatsapp"
+            t.contains("youtube") -> "youtube"
+            t.contains("chrome") -> "chrome"
+            t.contains("spotify") -> "spotify"
+            t.startsWith("close ") -> t.removePrefix("close ").trim()
+            t.startsWith("stop ") -> t.removePrefix("stop ").trim()
+            t.startsWith("exit ") -> t.removePrefix("exit ").trim()
+            t.endsWith(" band kara") -> t.removeSuffix(" band kara").trim()
+            t.endsWith(" band karo") -> t.removeSuffix(" band karo").trim()
+            t.endsWith(" बंद करा") -> t.removeSuffix(" बंद करा").trim()
+            t.endsWith(" बंद करो") -> t.removeSuffix(" बंद करो").trim()
+            else -> "app"
+        }
+        return act("close_app", "app" to appName)
+    }
 
     private fun parseAppLaunch(raw: String): PhoneAction? {
         val t = raw.lowercase().trim()
+        if (CLOSE_WORDS.containsMatchIn(t)) return null
         val appName = when {
             t.contains("youtube") -> "youtube"
             t.contains("spotify") || t == "play music" -> "spotify"
@@ -339,6 +361,26 @@ class PhoneHardwareExecutor(context: Context) {
             else -> null
         } ?: return null
         return act("open_app", "app" to appName)
+    }
+
+    private fun closeApp(name: String?): Outcome {
+        val service = JarvisAccessibilityService.instance
+        val appLabel = if (name.isNullOrBlank() || name == "app") "the app" else name
+        return if (service != null) {
+            service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
+            Outcome("Closed $appLabel.", true)
+        } else {
+            try {
+                val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_HOME)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                app.startActivity(homeIntent)
+                Outcome("Closed $appLabel.", true)
+            } catch (e: Exception) {
+                Outcome("Could not close $appLabel: ${e.message}", false)
+            }
+        }
     }
 
     private fun openApp(name: String?): Outcome {
@@ -373,7 +415,11 @@ class PhoneHardwareExecutor(context: Context) {
     // ================================================================================================
 
     private companion object {
-        val HARDWARE_ACTIONS = setOf("volume", "set_volume", "mute", "unmute", "torch", "flashlight", "flash", "call", "dial", "open_app", "app", "open")
+        val HARDWARE_ACTIONS = setOf(
+            "volume", "set_volume", "mute", "unmute", "torch", "flashlight", "flash", "call", "dial",
+            "open_app", "app", "open", "close_app", "close", "stop_app", "exit_app"
+        )
+        val CLOSE_WORDS = Regex("""\b(close|stop|exit|quit|band)\b|बंद|बन्द""")
 
         val VOLUME_WORDS = Regex("""\b(volume|sound|audio|louder|quieter|softer|mute|unmute|silent)\b|आवाज|वॉल्यूम|व्हॉल्यूम|म्यूट|अनम्यूट|ध्वनी|ध्वनि""")
         val UNMUTE = Regex("""\bunmute\b|अनम्यूट|आवाज\s*चालू""")

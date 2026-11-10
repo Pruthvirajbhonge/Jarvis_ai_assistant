@@ -77,9 +77,17 @@ class VoiceInteractionManager(context: Context) {
         RegexOption.IGNORE_CASE
     )
 
+    private var onNextSpeechDone: (() -> Unit)? = null
+
     init {
         voiceOut.onSpeechDone = {
-            speechFinished()
+            val pending = onNextSpeechDone
+            onNextSpeechDone = null
+            if (pending != null) {
+                pending()
+            } else {
+                speechFinished()
+            }
         }
     }
 
@@ -116,6 +124,33 @@ class VoiceInteractionManager(context: Context) {
         speaking = false
 
         beginRecognition(Mode.COMMAND)
+    }
+
+    /**
+     * Speaks a short wake greeting aloud (e.g. "Yes, sir?") and automatically opens
+     * the command microphone ONLY AFTER the greeting has finished speaking.
+     */
+    fun speakThenCommand(greeting: String) = runOnMain {
+        if (greeting.isBlank()) {
+            startCommandSession()
+            return@runOnMain
+        }
+
+        engine.stop()
+        main.removeCallbacksAndMessages(null)
+        if (mode == Mode.WAKE || mode == Mode.COMMAND) {
+            cancelRecognizer()
+            setMode(Mode.IDLE)
+        }
+
+        cancelCommandTimeout()
+
+        speaking = true
+        onNextSpeechDone = {
+            speaking = false
+            startCommandSession()
+        }
+        voiceOut.speak(greeting)
     }
 
     fun speak(text: String) = runOnMain {

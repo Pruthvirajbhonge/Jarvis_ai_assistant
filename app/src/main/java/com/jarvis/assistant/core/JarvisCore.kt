@@ -86,9 +86,17 @@ class JarvisCore(private val app: Application) {
     init {
         voice.onModeChanged = { m -> _state.update { it.copy(mode = m) } }
         voice.onAudioRms = { rms -> _state.update { it.copy(audioRms = rms) } }
+        val wakeGreetings = listOf(
+            "Yes, sir?",
+            "At your service, sir.",
+            "Listening, boss.",
+            "Yes, I'm listening."
+        )
+
         voice.onWakeWord = {
             wakeScreen()
-            voice.startCommandSession()
+            val greeting = wakeGreetings.random()
+            voice.speakThenCommand(greeting)
         }
         voice.onTranscript = { handleCommand(it) }
         voice.onError = { msg -> _state.update { it.copy(note = msg) } }

@@ -31,6 +31,7 @@ class PhoneActionExecutor(private val context: Context) {
             when (a.action.lowercase()) {
                 // apps & communication
                 "open_app" -> openApp(a.str("app", "name", "package"))
+                "close_app", "close", "stop_app", "exit_app" -> closeApp(a.str("app", "name", "package"))
                 // volume / flashlight / calls are really executed by PhoneHardwareExecutor
                 "call", "dial", "volume", "set_volume", "mute", "unmute", "torch", "flashlight" ->
                     hardware.execute(a)?.spoken ?: "That didn't work."
@@ -74,6 +75,12 @@ class PhoneActionExecutor(private val context: Context) {
     }
 
     // ---- apps -------------------------------------------------------------------------------
+
+    private fun closeApp(name: String?): String {
+        return hardware.execute(PhoneAction("close_app", kotlinx.serialization.json.buildJsonObject {
+            if (name != null) put("app", kotlinx.serialization.json.JsonPrimitive(name))
+        }))?.spoken ?: global(AccessibilityService.GLOBAL_ACTION_HOME, "Closed ${name ?: "app"}.")
+    }
 
     private fun openApp(name: String?): String {
         if (name.isNullOrBlank()) return "Which app should I open?"

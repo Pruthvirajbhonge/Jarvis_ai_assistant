@@ -43,17 +43,36 @@ object BackgroundLauncher {
 
         val service = JarvisAccessibilityService.instance
         val canLaunchDirectly = AppState.inForeground ||
-            (Settings.canDrawOverlays(app) && (Build.VERSION.SDK_INT < 34 || AppState.overlayVisible))
+            Settings.canDrawOverlays(app) ||
+            service != null
 
         // Nothing allows a background launch and we can't verify it: don't pretend, ask for a tap.
-        if (!canLaunchDirectly && service == null) {
+        if (!canLaunchDirectly) {
             blocked(app, intent, name)
             return
         }
 
+        val options = if (Build.VERSION.SDK_INT >= 34) {
+            try {
+                android.app.ActivityOptions.makeBasic().apply {
+                    setPendingIntentBackgroundActivityStartMode(
+                        android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                    )
+                }.toBundle()
+            } catch (_: Throwable) {
+                null
+            }
+        } else {
+            null
+        }
+
         val before = service?.foregroundPackage
         try {
-            app.startActivity(intent)
+            if (options != null) {
+                app.startActivity(intent, options)
+            } else {
+                app.startActivity(intent)
+            }
         } catch (e: ActivityNotFoundException) {
             throw e // let callers fall back (e.g. YouTube not installed -> open in the browser)
         } catch (e: Exception) {
