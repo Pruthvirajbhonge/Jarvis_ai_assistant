@@ -37,6 +37,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * App-wide singleton shared by MainActivity and the foreground service: one microphone owner,
@@ -231,7 +232,7 @@ class JarvisCore(private val app: Application) {
                 _state.update { it.copy(stats = listOf(Stat("CPU", m.cpu), Stat("RAM", m.ram), Stat("DISK", m.disk))) }
             }
             recomputeConnection()
-            delay(if (status.reachable) 15_000L else 8_000L)
+            delay((if (status.reachable) 15_000L else 8_000L).milliseconds)
         }
     }
 
