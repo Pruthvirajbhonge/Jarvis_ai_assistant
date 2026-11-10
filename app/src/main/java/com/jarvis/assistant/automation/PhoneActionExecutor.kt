@@ -85,27 +85,64 @@ class PhoneActionExecutor(private val context: Context) {
     private fun openApp(name: String?): String {
         if (name.isNullOrBlank()) return "Which app should I open?"
         val pm = context.packageManager
-        val launch: Intent? = if (name.contains('.')) {
-            pm.getLaunchIntentForPackage(name)
-        } else {
-            val query = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-            @Suppress("DEPRECATION")
-            val apps = if (Build.VERSION.SDK_INT >= 33) {
-                pm.queryIntentActivities(query, PackageManager.ResolveInfoFlags.of(0))
-            } else {
-                pm.queryIntentActivities(query, 0)
-            }
-            val match = apps.firstOrNull { it.loadLabel(pm).toString().equals(name, true) }
-                ?: apps.firstOrNull { it.loadLabel(pm).toString().contains(name, true) }
-            match?.let { pm.getLaunchIntentForPackage(it.activityInfo.packageName) }
-        }
+        val launch = findLaunchIntent(pm, name)
         return if (launch != null) {
             launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             BackgroundLauncher.start(context, launch, name)
             "Opening $name."
         } else {
-            "I couldn't find an app called $name."
+            "$name is not installed on your phone, sir. Please install it from the Play Store."
         }
+    }
+
+    private fun findLaunchIntent(pm: PackageManager, rawName: String): Intent? {
+        val queryName = rawName.lowercase().trim()
+        if (queryName.contains('.')) {
+            pm.getLaunchIntentForPackage(queryName)?.let { return it }
+        }
+
+        val query = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        @Suppress("DEPRECATION")
+        val apps = if (Build.VERSION.SDK_INT >= 33) {
+            pm.queryIntentActivities(query, PackageManager.ResolveInfoFlags.of(0))
+        } else {
+            pm.queryIntentActivities(query, 0)
+        }
+        if (apps.isEmpty()) return null
+
+        val searchTerms = when {
+            queryName == "notepad" || queryName == "notes" || queryName == "note" -> listOf("notepad", "notes", "note", "keep", "memo")
+            queryName == "freefire" || queryName == "free fire" || queryName == "ff" -> listOf("free fire", "freefire", "garena", "ff")
+            queryName == "gallery" || queryName == "photos" -> listOf("photos", "gallery")
+            queryName == "files" || queryName == "file manager" -> listOf("files", "file manager", "my files")
+            queryName == "camera" -> listOf("camera")
+            queryName == "calculator" -> listOf("calc", "calculator")
+            else -> listOf(queryName)
+        }
+
+        for (term in searchTerms) {
+            val termClean = term.replace(" ", "")
+            val match = apps.firstOrNull {
+                val label = it.loadLabel(pm).toString().lowercase()
+                label == term || label.contains(term) || label.replace(" ", "").contains(termClean)
+            }
+            if (match != null) {
+                return pm.getLaunchIntentForPackage(match.activityInfo.packageName)
+            }
+        }
+
+        for (term in searchTerms) {
+            val termClean = term.replace(" ", "")
+            val match = apps.firstOrNull {
+                val pkg = it.activityInfo.packageName.lowercase()
+                pkg.contains(termClean)
+            }
+            if (match != null) {
+                return pm.getLaunchIntentForPackage(match.activityInfo.packageName)
+            }
+        }
+
+        return null
     }
 
     private fun launch(intent: Intent) {
