@@ -27,13 +27,13 @@ class VoiceInteractionManager(context: Context) {
 
     companion object {
         private val WAKE_STRIP = Regex(
-            """\\b(hey|hi|ok|okay)?\\s*(jarvis|jar\\s*vis|jarvish|jarves|jarvas|javis|जार्विस|जर्विस|जार्वीस)\\b[,.!?]*""",
+            """\b(hey|hi|ok|okay)?\s*(jarvis|jar\s*vis|jarvish|jarves|jarvas|javis|जार्विस|जर्विस|जार्वीस)\b[,.!?]*""",
             RegexOption.IGNORE_CASE
         )
 
         /** The single canonical wake-phrase extractor used by every voice input path. */
         fun extractCommand(captured: String?): String =
-            captured.orEmpty().replace(WAKE_STRIP, " ").replace(Regex("""\\s+"""), " ").trim()
+            captured.orEmpty().replace(WAKE_STRIP, " ").replace(Regex("""\s+"""), " ").trim()
     }
 
     enum class Mode {
