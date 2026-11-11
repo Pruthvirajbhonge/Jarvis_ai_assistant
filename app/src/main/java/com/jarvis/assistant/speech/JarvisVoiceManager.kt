@@ -70,6 +70,7 @@ class JarvisVoiceManager(context: Context) {
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+    private var pendingLocal: Pair<String, Int>? = null
     private var maleVoice: Voice? = null
 
     init {
@@ -86,6 +87,13 @@ class JarvisVoiceManager(context: Context) {
                 })
                 tts?.let { maleVoice = pickMaleVoice(it) }
                 Log.i(TAG, "Offline voice: ${maleVoice?.name ?: "engine default"}")
+                val pending = pendingLocal
+                pendingLocal = null
+                if (pending != null) speakLocal(pending.first, pending.second)
+            } else {
+                val pending = pendingLocal
+                pendingLocal = null
+                if (pending != null) finish(pending.second)
             }
         }
     }
@@ -122,6 +130,7 @@ class JarvisVoiceManager(context: Context) {
         speakId++
         job?.cancel()
         job = null
+        pendingLocal = null
         releasePlayer()
         tts?.stop()
     }
@@ -179,8 +188,14 @@ class JarvisVoiceManager(context: Context) {
 
     private fun speakLocal(text: String, id: Int) {
         val engine = tts
-        if (!ttsReady || engine == null) {
+        if (engine == null) {
             finish(id)
+            return
+        }
+        if (!ttsReady) {
+            // TextToSpeech initialization is asynchronous. Queue instead of silently
+            // completing the response before the engine becomes ready.
+            pendingLocal = text to id
             return
         }
         if (isDevanagari(text)) {
