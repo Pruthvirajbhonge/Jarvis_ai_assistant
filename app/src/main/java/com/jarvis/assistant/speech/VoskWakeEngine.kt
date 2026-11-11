@@ -70,6 +70,7 @@ class VoskWakeEngine(
     private var active = false
     @Volatile private var generation = 0
     @Volatile private var commandMode = false
+    @Volatile private var currentAudio: AudioRecord? = null
 
     fun start() = startInternal(commandSession = false)
 
@@ -88,9 +89,18 @@ class VoskWakeEngine(
     }
 
     fun stop() {
+        val recorder: AudioRecord?
         synchronized(lock) {
             active = false
             generation++
+            recorder = currentAudio
+        }
+        // Stop the blocking read so the capture thread can release the hardware before
+        // a new wake/command session or TTS playback begins.
+        try {
+            if (recorder?.recordingState == AudioRecord.RECORDSTATE_RECORDING) recorder.stop()
+        } catch (_: Exception) {
+            // The capture thread owns final release.
         }
     }
 
@@ -120,11 +130,20 @@ class VoskWakeEngine(
                 throw IllegalStateException("Microphone is not available.")
             }
 
+            synchronized(lock) {
+                if (g != generation || !active) {
+                    audio.release()
+                    return
+                }
+                currentAudio = audio
+            }
+
             val agc = AdaptiveGain()
             val rec = if (spk != null) Recognizer(m, SAMPLE_RATE, spk) else Recognizer(m, SAMPLE_RATE)
 
             rec.use {
                 try {
+                    if (g != generation) return
                     audio.startRecording()
                     val buf = ShortArray(2048)
                     while (g == generation) {
@@ -172,7 +191,12 @@ class VoskWakeEngine(
                         break
                     }
                 } finally {
-                    try { audio.stop() } catch (e: Exception) {}
+                    try {
+                        if (audio.recordingState == AudioRecord.RECORDSTATE_RECORDING) audio.stop()
+                    } catch (_: Exception) {}
+                    synchronized(lock) {
+                        if (currentAudio === audio) currentAudio = null
+                    }
                     audio.release()
                 }
             }
