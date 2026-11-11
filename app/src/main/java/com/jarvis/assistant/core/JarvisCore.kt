@@ -102,18 +102,17 @@ class JarvisCore(private val app: Application) {
             "Yes, I'm listening."
         )
 
-        voice.onWakeWord = { capturedText ->
+        voice.onVoiceEvent = { event ->
             wakeScreen()
-            val cleanCmd = capturedText?.lowercase()?.trim()
-                ?.removePrefix("hey")?.removePrefix("jarvis")
-                ?.removePrefix("hi")?.removePrefix("direct")
-                ?.trim()
-
-            if (!cleanCmd.isNullOrBlank() && cleanCmd.length >= 3) {
-                handleCommand(cleanCmd)
-            } else {
-                val greeting = wakeGreetings.random()
-                voice.speakThenCommand(greeting)
+            when (event) {
+                is VoiceInteractionManager.VoiceEvent.DirectCommand -> {
+                    // Already owner-verified by Vosk. Execute exactly once, without greeting.
+                    handleCommand(event.command)
+                }
+                VoiceInteractionManager.VoiceEvent.WakeOnly -> {
+                    // Wake-only event: speak first, then open one owner-verified command capture.
+                    voice.speakThenCommand(wakeGreetings.random())
+                }
             }
         }
         voice.onTranscript = { handleCommand(it) }
