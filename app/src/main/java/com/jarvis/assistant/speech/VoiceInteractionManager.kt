@@ -49,6 +49,7 @@ class VoiceInteractionManager(context: Context) {
 
     private var speaking = false
     private var wakeEnabled = false
+    @Volatile private var enrollmentPaused = false
     private var sessionId = 0
 
     // Command timeout: maximum wait for user to START speaking.
@@ -64,7 +65,7 @@ class VoiceInteractionManager(context: Context) {
     private var useEngine = true
 
     val verifier = SpeakerVerificationEngine(appContext)
-    val enrollmentManager = VoiceEnrollmentManager(appContext)
+    val enrollmentManager = VoiceEnrollmentManager(appContext, verifier)
     @Volatile var isMicMuted: Boolean = false
     var isModeASupplier: (() -> Boolean)? = null
 
@@ -148,7 +149,20 @@ class VoiceInteractionManager(context: Context) {
         }
     }
 
+    fun pauseForEnrollment() = runOnMain {
+        enrollmentPaused = true
+        engine.stop()
+        cancelCommandTimeout()
+        if (mode == Mode.WAKE || mode == Mode.COMMAND) setMode(Mode.IDLE)
+    }
+
+    fun resumeAfterEnrollment() = runOnMain {
+        enrollmentPaused = false
+        if (wakeEnabled && !isMicMuted && !speaking && mode == Mode.IDLE) scheduleWake(500L)
+    }
+
     fun startCommandSession() = runOnMain {
+        if (enrollmentPaused) return@runOnMain
         if (isMicMuted) {
             onError?.invoke("Microphone is muted.")
             return@runOnMain
@@ -255,7 +269,7 @@ class VoiceInteractionManager(context: Context) {
     }
 
     private fun enterWake() {
-        if (!useEngine || isMicMuted || speaking || mode != Mode.IDLE) return
+        if (!useEngine || enrollmentPaused || isMicMuted || speaking || mode != Mode.IDLE) return
         cancelCommandTimeout()
         cancelRecognizer()
         setMode(Mode.WAKE)
