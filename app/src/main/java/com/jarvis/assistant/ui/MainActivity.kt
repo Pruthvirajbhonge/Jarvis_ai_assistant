@@ -395,38 +395,50 @@ class MainActivity : AppCompatActivity() {
     private fun captureAudioSample(onCaptured: (ShortArray) -> Unit) {
         if (!hasPermission(Manifest.permission.RECORD_AUDIO)) {
             requestMandatoryPermissions()
+            onCaptured(ShortArray(0))
             return
         }
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val sampleRate = 16000
-            val minBuf = android.media.AudioRecord.getMinBufferSize(
-                sampleRate,
-                android.media.AudioFormat.CHANNEL_IN_MONO,
-                android.media.AudioFormat.ENCODING_PCM_16BIT
-            )
-            val audioRecord = android.media.AudioRecord(
-                android.media.MediaRecorder.AudioSource.MIC,
-                sampleRate,
-                android.media.AudioFormat.CHANNEL_IN_MONO,
-                android.media.AudioFormat.ENCODING_PCM_16BIT,
-                maxOf(minBuf, 4096) * 2
-            )
-            val buffer = ShortArray(sampleRate * 2) // 2 seconds of audio
+            var audioRecord: android.media.AudioRecord? = null
+            var captured = ShortArray(0)
             try {
+                val sampleRate = 16000
+                val minBuf = android.media.AudioRecord.getMinBufferSize(
+                    sampleRate,
+                    android.media.AudioFormat.CHANNEL_IN_MONO,
+                    android.media.AudioFormat.ENCODING_PCM_16BIT
+                )
+                require(minBuf > 0) { "Invalid microphone buffer size: $minBuf" }
+                audioRecord = android.media.AudioRecord(
+                    android.media.MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                    sampleRate,
+                    android.media.AudioFormat.CHANNEL_IN_MONO,
+                    android.media.AudioFormat.ENCODING_PCM_16BIT,
+                    maxOf(minBuf, 4096) * 2
+                )
+                check(audioRecord.state == android.media.AudioRecord.STATE_INITIALIZED) {
+                    "Microphone could not be initialized."
+                }
+                val buffer = ShortArray(sampleRate * 4) // 4 seconds for a stable speaker vector
                 audioRecord.startRecording()
                 var readTotal = 0
-                val chunkSize = 1024
                 while (readTotal < buffer.size) {
-                    val n = audioRecord.read(buffer, readTotal, minOf(chunkSize, buffer.size - readTotal))
-                    if (n > 0) readTotal += n else break
+                    val n = audioRecord.read(buffer, readTotal, minOf(1024, buffer.size - readTotal))
+                    if (n < 0) throw IllegalStateException("Microphone read failed: $n")
+                    if (n == 0) continue
+                    readTotal += n
                 }
-                audioRecord.stop()
-                audioRecord.release()
-                lifecycleScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                    onCaptured(buffer)
-                }
-            } catch (_: Exception) {
-                try { audioRecord.release() } catch (_: Exception) {}
+                captured = buffer.copyOf(readTotal)
+            } catch (e: Exception) {
+                android.util.Log.e("JarvisEnrollment", "Audio capture failed", e)
+            } finally {
+                try {
+                    if (audioRecord?.recordingState == android.media.AudioRecord.RECORDSTATE_RECORDING) audioRecord.stop()
+                } catch (_: Exception) {}
+                try { audioRecord?.release() } catch (_: Exception) {}
+            }
+            lifecycleScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                onCaptured(captured)
             }
         }
     }
@@ -565,9 +577,30 @@ class MainActivity : AppCompatActivity() {
             }
 
             b.btnEnrollVoiceprint.setOnClickListener {
-                enrollment?.startEnrollment()
+                if (!hasPermission(Manifest.permission.RECORD_AUDIO)) {
+                    requestMandatoryPermissions()
+                    return@setOnClickListener
+                }
+                val manager = voiceManager
+                val enroller = enrollment
+                if (manager == null || enroller == null) {
+                    b.tvVoiceprintStatus.text = "Status: Voice service unavailable."
+                    return@setOnClickListener
+                }
+
+                // Stop the background wake recorder before opening the enrollment recorder.
+                manager.pauseForEnrollment()
+                enroller.startEnrollment()
+
+                fun finishEnrollmentSession() {
+                    manager.resumeAfterEnrollment()
+                }
+
                 fun recordNextSample(step: Int) {
-                    if (step > 3) return
+                    if (step > 3) {
+                        finishEnrollmentSession()
+                        return
+                    }
                     val phrase = when (step) {
                         1 -> "Sample 1/3: Speak phrase 'Jarvis, this is my voice.'"
                         2 -> "Sample 2/3: Speak phrase 'System online, voice authentication active.'"
@@ -576,21 +609,46 @@ class MainActivity : AppCompatActivity() {
                     }
                     MaterialAlertDialogBuilder(this@MainActivity)
                         .setTitle("Voiceprint Enrollment ($step/3)")
-                        .setMessage("$phrase\n\nTap 'Record' and speak into the microphone for 2 seconds.")
+                        .setMessage("$phrase\n\nTap Record, then speak clearly for 4 seconds in a quiet room.")
                         .setPositiveButton("Record") { _, _ ->
                             Toast.makeText(this@MainActivity, "Recording $step/3... Speak now!", Toast.LENGTH_SHORT).show()
                             captureAudioSample { pcm ->
-                                val xvector = FloatArray(128) { (pcm.getOrNull(it % pcm.size)?.toFloat() ?: 0f) / 32768f }
-                                val finished = enrollment?.addXvectorSample(xvector) == true
-                                if (finished) {
-                                    b.tvVoiceprintStatus.text = "Status: Enrolled (3 samples, threshold: ${(current.speakerThreshold * 100).toInt()}%)"
-                                    Toast.makeText(this@MainActivity, "Voiceprint Enrollment Complete!", Toast.LENGTH_LONG).show()
-                                } else {
-                                    recordNextSample(step + 1)
+                                lifecycleScope.launch {
+                                    val xvector = try {
+                                        enroller.extractXvector(pcm)
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("JarvisEnrollment", "x-vector extraction failed", e)
+                                        null
+                                    }
+                                    if (xvector == null) {
+                                        Toast.makeText(
+                                            this@MainActivity,
+                                            "Could not extract a clean voice sample. Retry in a quiet room.",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                        recordNextSample(step)
+                                        return@launch
+                                    }
+
+                                    val finished = enroller.addXvectorSample(xvector)
+                                    if (finished) {
+                                        b.tvVoiceprintStatus.text = "Status: Enrolled (3 valid Vosk samples, threshold: ${(current.speakerThreshold * 100).toInt()}%)"
+                                        Toast.makeText(this@MainActivity, "Voiceprint Enrollment Complete!", Toast.LENGTH_LONG).show()
+                                        finishEnrollmentSession()
+                                    } else {
+                                        recordNextSample(step + 1)
+                                    }
                                 }
                             }
                         }
-                        .setNegativeButton("Cancel", null)
+                        .setNegativeButton("Cancel") { _, _ ->
+                            enroller.cancelEnrollment()
+                            finishEnrollmentSession()
+                        }
+                        .setOnCancelListener {
+                            enroller.cancelEnrollment()
+                            finishEnrollmentSession()
+                        }
                         .show()
                 }
                 recordNextSample(1)
