@@ -95,9 +95,6 @@ class MainActivity : AppCompatActivity() {
         setupSettingsScreen()
         observeState()
         requestMandatoryPermissions()
-        // If permissions were granted in an earlier run, the permission result callback
-        // will NOT fire. Start the microphone foreground service explicitly in that case.
-        startJarvisBackgroundService()
         handleSuggestionIntent(intent)
     }
 
@@ -727,16 +724,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startJarvisBackgroundService() {
-        if (!hasPermission(Manifest.permission.RECORD_AUDIO)) {
-            android.util.Log.w("JarvisService", "Not starting background listener: RECORD_AUDIO permission missing.")
-            return
-        }
-        try {
-            ContextCompat.startForegroundService(this, Intent(this, JarvisBackgroundService::class.java))
-            android.util.Log.i("JarvisService", "Requested microphone foreground service start.")
-        } catch (e: Exception) {
-            android.util.Log.e("JarvisService", "Foreground microphone service start failed.", e)
-            Toast.makeText(this, "Jarvis background microphone could not start: ${e.message}", Toast.LENGTH_LONG).show()
-        }
+        if (!hasPermission(Manifest.permission.RECORD_AUDIO)) return
+        ContextCompat.startForegroundService(this, Intent(this, JarvisBackgroundService::class.java))
     }
 }
