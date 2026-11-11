@@ -20,22 +20,6 @@ import android.speech.SpeechRecognizer
 
 class VoiceInteractionManager(context: Context) {
 
-    sealed class VoiceEvent {
-        data class DirectCommand(val command: String) : VoiceEvent()
-        data object WakeOnly : VoiceEvent()
-    }
-
-    companion object {
-        private val WAKE_STRIP = Regex(
-            """\\b(hey|hi|ok|okay)?\\s*(jarvis|jar\\s*vis|jarvish|jarves|jarvas|javis|जार्विस|जर्विस|जार्वीस)\\b[,.!?]*""",
-            RegexOption.IGNORE_CASE
-        )
-
-        /** The single canonical wake-phrase extractor used by every voice input path. */
-        fun extractCommand(captured: String?): String =
-            captured.orEmpty().replace(WAKE_STRIP, " ").replace(Regex("""\\s+"""), " ").trim()
-    }
-
     enum class Mode {
         IDLE, WAKE, COMMAND
     }
@@ -87,7 +71,7 @@ class VoiceInteractionManager(context: Context) {
     var mode: Mode = Mode.IDLE
         private set
 
-    var onVoiceEvent: ((VoiceEvent) -> Unit)? = null
+    var onWakeWord: ((text: String?) -> Unit)? = null
     var onTranscript: ((String) -> Unit)? = null
     var onModeChanged: ((Mode) -> Unit)? = null
     var onError: ((String) -> Unit)? = null
@@ -151,16 +135,12 @@ class VoiceInteractionManager(context: Context) {
             return@runOnMain
         }
 
-        cancelCommandTimeout()
-        main.removeCallbacksAndMessages(null)
-        cancelRecognizer()
+        engine.stop()
+
         voiceOut.stop()
         speaking = false
-        onNextSpeechDone = null
-        setMode(Mode.COMMAND)
-        // Do not use SpeechRecognizer here: it has no x-vector and cannot authenticate
-        // the speaker. Vosk command capture applies the same enrolled-owner verifier.
-        engine.startCommand()
+
+        beginRecognition(Mode.COMMAND)
     }
 
     /**
@@ -193,7 +173,7 @@ class VoiceInteractionManager(context: Context) {
     fun speak(text: String) = runOnMain {
         if (text.isBlank()) return@runOnMain
 
-        if (mode == Mode.WAKE || mode == Mode.COMMAND) {
+        if (mode == Mode.WAKE) {
             engine.stop()
             main.removeCallbacksAndMessages(null)
             cancelRecognizer()
@@ -252,40 +232,34 @@ class VoiceInteractionManager(context: Context) {
     }
 
     private fun enterWake() {
-        if (!useEngine || isMicMuted || speaking || mode != Mode.IDLE) return
-        cancelCommandTimeout()
-        cancelRecognizer()
-        setMode(Mode.WAKE)
-        engine.start()
+        if (useEngine) {
+            cancelCommandTimeout()
+            main.removeCallbacksAndMessages(null)
+            cancelRecognizer()
+
+            setMode(Mode.WAKE)
+            engine.start()
+
+        } else {
+            beginRecognition(Mode.WAKE)
+        }
     }
 
     private fun onEngineWake(capturedText: String? = null) {
-        if (mode != Mode.WAKE && mode != Mode.COMMAND) return
+        if (mode != Mode.WAKE) return
 
-        val wasCommandSession = mode == Mode.COMMAND
         setMode(Mode.IDLE)
-
-        if (wasCommandSession) {
-            val command = extractCommand(capturedText)
-            if (command.isNotBlank()) onTranscript?.invoke(command)
-            else onError?.invoke("I didn't catch that.")
-            return
-        }
-
-        val command = extractCommand(capturedText)
-        if (command.isNotBlank()) {
-            onVoiceEvent?.invoke(VoiceEvent.DirectCommand(command))
-        } else {
-            onVoiceEvent?.invoke(VoiceEvent.WakeOnly)
-        }
+        onWakeWord?.invoke(capturedText)
     }
 
     private fun engineFailed(msg: String) {
-        // Fail closed. SpeechRecognizer has no speaker x-vector, so falling back to it
-        // would bypass owner verification. Keep the mic stopped until Vosk is available.
         useEngine = false
-        setMode(Mode.IDLE)
-        onError?.invoke("$msg Owner verification is unavailable; voice commands are disabled.")
+
+        onError?.invoke("$msg Using basic wake mode.")
+
+        if (wakeEnabled && mode != Mode.COMMAND && !speaking) {
+            beginRecognition(Mode.WAKE)
+        }
     }
 
     // --------------------------------------------------
@@ -464,9 +438,12 @@ class VoiceInteractionManager(context: Context) {
         cancelCommandTimeout()
 
         cancelRecognizer()
+
         setMode(Mode.IDLE)
-        // The command handler's TTS completion is the single point that restarts wake.
-        // Restarting here races command execution and can open two microphone sessions.
+
+        if (wakeEnabled) {
+            scheduleWake(400)
+        }
     }
 
     // --------------------------------------------------
@@ -517,7 +494,7 @@ class VoiceInteractionManager(context: Context) {
 
                     endSession()
 
-                    onTranscript?.invoke(extractCommand(hit))
+                    onTranscript?.invoke(remainder)
 
                 } else {
 
@@ -525,7 +502,7 @@ class VoiceInteractionManager(context: Context) {
 
                     setMode(Mode.IDLE)
 
-                    onVoiceEvent?.invoke(VoiceEvent.WakeOnly)
+                    onWakeWord?.invoke(hit)
                 }
             }
 
@@ -579,7 +556,7 @@ class VoiceInteractionManager(context: Context) {
 
             cancelRecognizer()
 
-            if (useEngine) scheduleWake(
+            scheduleWake(
                 when (error) {
 
                     SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
