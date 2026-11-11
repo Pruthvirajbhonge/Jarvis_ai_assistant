@@ -98,12 +98,6 @@ class VoiceEnrollmentManager(
         }
     }
 
-    fun cancelEnrollment() {
-        verifier.beginEnrollment()
-        _sampleProgress.value = 0
-        _enrollmentState.value = "Enrollment cancelled."
-    }
-
     fun deleteVoiceprint() {
         verifier.clearEnrollment()
         _sampleProgress.value = 0
