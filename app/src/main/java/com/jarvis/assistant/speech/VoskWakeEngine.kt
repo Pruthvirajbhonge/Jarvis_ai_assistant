@@ -48,7 +48,7 @@ class AdaptiveGain {
 }
 
 /**
- * Offline "Jarvis" detector. Owns one AudioRecord per capture session and releases it cleanly.
+ * Always-on offline "Jarvis" detector. Opens the mic ONCE.
  *
  * Owner-only mode: when [speakerEngine] is given, a wake/command is accepted ONLY if the
  * FINISHED utterance's speaker x-vector matches the enrolled owner. Fails closed: if the owner
@@ -201,16 +201,13 @@ class VoskWakeEngine(
                 }
             }
         } catch (e: Exception) {
-            val reportFailure = synchronized(lock) {
+            synchronized(lock) {
                 if (g == generation) {
                     active = false
                     generation++
-                    true
-                } else {
-                    false // expected when stop() interrupts a blocking AudioRecord.read()
                 }
             }
-            if (reportFailure) onFailure(e.message ?: "Wake engine failed.")
+            onFailure(e.message ?: "Wake engine failed.")
         }
         // Dispatch only after AudioRecord has been stopped and released. This prevents
         // the next TTS/command session from racing the previous capture teardown.
