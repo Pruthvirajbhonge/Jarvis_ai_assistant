@@ -69,22 +69,15 @@ class VoskWakeEngine(
     private var spkModel: SpeakerModel? = null
     private var active = false
     @Volatile private var generation = 0
-    @Volatile private var commandMode = false
 
-    fun start() = startInternal(commandSession = false)
-
-    /** Starts a one-shot command capture. The finished utterance is still owner-verified. */
-    fun startCommand() = startInternal(commandSession = true)
-
-    private fun startInternal(commandSession: Boolean) {
+    fun start() {
         val g: Int
         synchronized(lock) {
             if (active) return
             active = true
-            commandMode = commandSession
             g = ++generation
         }
-        Thread({ runLoop(g) }, if (commandSession) "jarvis-command" else "jarvis-wake").start()
+        Thread({ runLoop(g) }, "jarvis-wake").start()
     }
 
     fun stop() {
@@ -96,8 +89,6 @@ class VoskWakeEngine(
 
     @SuppressLint("MissingPermission")
     private fun runLoop(g: Int) {
-        var callbackText: String? = null
-        val commandSession = commandMode
         try {
             // Fail closed: never accept everyone.
             if (speakerEngine != null && !speakerEngine.isEnrolled) {
@@ -142,8 +133,7 @@ class VoskWakeEngine(
                         if (text.isEmpty()) continue
 
                         val modeA = isModeA?.invoke() == true
-                        val accepted = commandSession ||
-                            WAKE.containsMatchIn(text) ||
+                        val accepted = WAKE.containsMatchIn(text) ||
                             (modeA && COMMAND_KEYWORDS.containsMatchIn(text))
                         if (!accepted) continue
 
@@ -168,7 +158,7 @@ class VoskWakeEngine(
                                 fire = true
                             }
                         }
-                        if (fire) callbackText = text
+                        if (fire) onWake(text)
                         break
                     }
                 } finally {
@@ -185,9 +175,6 @@ class VoskWakeEngine(
             }
             onFailure(e.message ?: "Wake engine failed.")
         }
-        // Dispatch only after AudioRecord has been stopped and released. This prevents
-        // the next TTS/command session from racing the previous capture teardown.
-        callbackText?.let(onWake)
     }
 
     // ---- models -----------------------------------------------------------------------------
@@ -214,7 +201,7 @@ class VoskWakeEngine(
         const val SAMPLE_RATE = 16000f
         const val MIN_SPK_FRAMES = 50 // ~0.5 s of speech; raise to 100 for stricter verification
         val modelLock = Any()
-        val WAKE = Regex("\\b(jarvis|jar vis|jarvish|jarves|jarvas|javis|जार्विस|जर्विस|जार्वीस)\\b", RegexOption.IGNORE_CASE)
+        val WAKE = Regex("\\b(jarvis|jar vis|jarvish|jarves|jarvas|javis)\\b", RegexOption.IGNORE_CASE)
         // Mode A: ONLY known command words (the old `text.length >= 8` rule accepted any chatter).
         val COMMAND_KEYWORDS = Regex(
             """\b(open|close|turn|set|call|dial|play|stop|search|show|find|volume|torch|flashlight|whatsapp|youtube|spotify|chrome|freefire|notes|camera|calculator|gallery|settings|mute|unmute|up|down|back|home|recents)\b|उघड|उघडा|चालू|चालु|बंद|कॉल|फोन|सर्च|शोधा|आवाज""",
