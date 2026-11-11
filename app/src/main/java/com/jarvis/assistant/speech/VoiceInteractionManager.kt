@@ -376,6 +376,16 @@ class VoiceInteractionManager(context: Context) {
             )
 
             putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
+                recognitionLocale
+            )
+
+            putExtra(
+                "android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES",
+                arrayOf("en-IN", "en-US")
+            )
+
+            putExtra(
                 RecognizerIntent.EXTRA_PARTIAL_RESULTS,
                 false
             )
@@ -420,7 +430,7 @@ class VoiceInteractionManager(context: Context) {
                 startCommandTimeout(currentId)
             }
 
-        } catch (e: Exception) {
+        } catch (_: Exception) {
 
             if (currentId == sessionId) {
                 handleError(

@@ -81,9 +81,28 @@ class PhoneHardwareExecutor(context: Context) {
         return parseTorch(t) ?: parseVolume(t) ?: parseCall(raw.trim()) ?: parseCloseApp(raw.trim()) ?: parseAppLaunch(raw.trim())
     }
 
-    /** Lower-cases and converts Devanagari digits (८०) to ASCII (80). */
-    private fun normalize(s: String): String = buildString {
-        for (c in s.lowercase().trim()) append(if (c in '\u0966'..'\u096F') '0' + (c - '\u0966') else c)
+    /** Lower-cases, converts Devanagari digits (८०) to ASCII (80), and transliterates common Devanagari voice keywords. */
+    private fun normalize(s: String): String {
+        val asciiDigits = buildString {
+            for (c in s.lowercase().trim()) append(if (c in '\u0966'..'\u096F') '0' + (c - '\u0966') else c)
+        }
+        var result = asciiDigits
+        val transliterations = mapOf(
+            "ओपन" to "open", "उघडा" to "open", "उघड" to "open", "खोलो" to "open",
+            "व्हाट्सएप" to "whatsapp", "व्हॉट्सॲप" to "whatsapp", "व्हाट्सॲप" to "whatsapp",
+            "यूट्यूब" to "youtube", "युट्यूब" to "youtube",
+            "क्रोम" to "chrome",
+            "वॉल्यूम" to "volume", "व्हॉल्यूम" to "volume", "आवाज" to "volume",
+            "टॉर्च" to "torch", "टोर्च" to "torch", "फ्लॅशलाइट" to "torch", "फ्लॅशलाईट" to "torch",
+            "कॉल" to "call", "फोन" to "call",
+            "बंद" to "close", "बन्द" to "close"
+        )
+        for ((devanagari, english) in transliterations) {
+            if (result.contains(devanagari)) {
+                result = result.replace(devanagari, english)
+            }
+        }
+        return result
     }
 
     private fun act(name: String, vararg kv: Pair<String, Any>) = PhoneAction(
@@ -175,7 +194,7 @@ class PhoneHardwareExecutor(context: Context) {
                     else -> Outcome("What volume level should I set, sir?", false)
                 }
             }
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
             Outcome("The phone didn't allow me to change the volume.", false)
         } catch (e: Exception) {
             Outcome("I couldn't change the volume: ${e.message}", false)
@@ -220,9 +239,9 @@ class PhoneHardwareExecutor(context: Context) {
             camera.setTorchMode(id, want)
             torchStates[id] = want
             Outcome(if (want) "Flashlight on." else "Flashlight off.", true)
-        } catch (e: CameraAccessException) {
+        } catch (_: CameraAccessException) {
             Outcome("I couldn't reach the flashlight. Another app may be using the camera.", false)
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             Outcome("This phone's flashlight can't be controlled.", false)
         }
     }
@@ -269,9 +288,9 @@ class PhoneHardwareExecutor(context: Context) {
                 val telecom = app.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
                 telecom.placeCall(Uri.fromParts("tel", number, null), Bundle())
                 return Outcome("Calling $display.", true)
-            } catch (e: SecurityException) {
+            } catch (_: SecurityException) {
                 // fall back to the intent below
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // fall back to the intent below
             }
         }
@@ -284,7 +303,7 @@ class PhoneHardwareExecutor(context: Context) {
             BackgroundLauncher.start(app, intent, display)
             if (canCall) Outcome("Calling $display.", true)
             else Outcome("Opened the dialer for $display. Allow the Phone permission so I can call directly.", false)
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
             Outcome("The phone blocked the call. Please allow the Phone permission.", false)
         } catch (e: Exception) {
             Outcome("I couldn't place the call: ${e.message}", false)
