@@ -102,10 +102,19 @@ class JarvisCore(private val app: Application) {
             "Yes, I'm listening."
         )
 
-        voice.onWakeWord = {
+        voice.onWakeWord = { capturedText ->
             wakeScreen()
-            val greeting = wakeGreetings.random()
-            voice.speakThenCommand(greeting)
+            val cleanCmd = capturedText?.lowercase()?.trim()
+                ?.removePrefix("hey")?.removePrefix("jarvis")
+                ?.removePrefix("hi")?.removePrefix("direct")
+                ?.trim()
+
+            if (!cleanCmd.isNullOrBlank() && cleanCmd.length >= 3) {
+                handleCommand(cleanCmd)
+            } else {
+                val greeting = wakeGreetings.random()
+                voice.speakThenCommand(greeting)
+            }
         }
         voice.onTranscript = { handleCommand(it) }
         voice.onError = { msg -> _state.update { it.copy(note = msg) } }
@@ -115,10 +124,13 @@ class JarvisCore(private val app: Application) {
             voice.speak(msg)
         }
 
+        voice.isModeASupplier = { latest.voiceAuthEnabled && latest.voiceAuthMode == "MODE_A" }
+
         // Mirror persisted settings into the UI state (works even before the service starts).
         scope.launch {
             settings.flow.collect { s ->
                 latest = s
+                voice.isMicMuted = s.micHardwareMuted
                 _state.update { it.copy(pcMode = s.pcMode) }
                 recomputeConnection()
             }
@@ -228,6 +240,13 @@ class JarvisCore(private val app: Application) {
 
     fun onForegroundPackageChanged(pkg: String) {
         contextTracker.onForegroundPackageChanged(pkg)
+    }
+
+    fun setMicMuted(muted: Boolean) {
+        voice.isMicMuted = muted
+        scope.launch { settings.setMicMuted(muted) }
+        val msg = if (muted) "Microphone muted, sir." else "Microphone unmuted, sir."
+        _state.update { it.copy(note = msg) }
     }
 
     suspend fun testAi(s: JarvisSettings): String = repository.testProviders(s)

@@ -263,6 +263,64 @@
             style="@style/TextAppearance.Material3.LabelMedium"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Personal Voice Authentication"
+            android:textColor="#80D8FF" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchVoiceAuth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Enable Speaker Verification"
+            android:textColor="#FFFFFF" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchVoiceModeA"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Mode A: Direct Voice (No 'Hey Jarvis' required)"
+            android:textColor="#80D8FF" />
+
+        <TextView
+            android:id="@+id/tvVoiceprintStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Status: No voiceprint enrolled yet."
+            android:textColor="#B0BEC5"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnEnrollVoiceprint"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="Enroll Voiceprint" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDeleteVoiceprint"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="Delete Voiceprint" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/TextAppearance.Material3.LabelMedium"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
             android:text="PC mode (optional) — PC address (IP:port)"
             android:textColor="#80D8FF" />

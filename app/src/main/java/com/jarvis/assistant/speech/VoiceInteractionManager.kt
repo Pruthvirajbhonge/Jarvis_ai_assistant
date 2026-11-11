@@ -47,24 +47,42 @@ class VoiceInteractionManager(context: Context) {
     // Vosk continuous wake engine.
     private var useEngine = true
 
+    val enrollmentManager = VoiceEnrollmentManager(appContext)
+    val verifier = SpeakerVerificationEngine()
+    @Volatile var isMicMuted: Boolean = false
+    var isModeASupplier: (() -> Boolean)? = null
+
     private val engine = VoskWakeEngine(
         context = appContext,
-        onWake = {
-            main.post { onEngineWake() }
+        onWake = { capturedText ->
+            main.post { onEngineWake(capturedText) }
         },
         onStatus = { msg ->
             main.post { onError?.invoke(msg) }
         },
         onFailure = { msg ->
             main.post { engineFailed(msg) }
-        }
+        },
+        onSpeakerVerify = { pcm ->
+            val embedding = enrollmentManager.currentEmbedding
+            if (embedding == null || !embedding.isValid) {
+                true
+            } else {
+                val res = verifier.verify(pcm, embedding)
+                if (!res.isMatched) {
+                    main.post { onError?.invoke("Access Denied: ${res.reason}") }
+                }
+                res.isMatched
+            }
+        },
+        isModeA = { isModeASupplier?.invoke() == true }
     )
 
     @Volatile
     var mode: Mode = Mode.IDLE
         private set
 
-    var onWakeWord: (() -> Unit)? = null
+    var onWakeWord: ((text: String?) -> Unit)? = null
     var onTranscript: ((String) -> Unit)? = null
     var onModeChanged: ((Mode) -> Unit)? = null
     var onError: ((String) -> Unit)? = null
@@ -98,6 +116,11 @@ class VoiceInteractionManager(context: Context) {
     fun startWake() = runOnMain {
         wakeEnabled = true
 
+        if (isMicMuted) {
+            onError?.invoke("Microphone is muted.")
+            return@runOnMain
+        }
+
         if (mode == Mode.IDLE && !speaking) {
             enterWake()
         }
@@ -118,6 +141,11 @@ class VoiceInteractionManager(context: Context) {
     }
 
     fun startCommandSession() = runOnMain {
+        if (isMicMuted) {
+            onError?.invoke("Microphone is muted.")
+            return@runOnMain
+        }
+
         engine.stop()
 
         voiceOut.stop()
@@ -228,11 +256,11 @@ class VoiceInteractionManager(context: Context) {
         }
     }
 
-    private fun onEngineWake() {
+    private fun onEngineWake(capturedText: String? = null) {
         if (mode != Mode.WAKE) return
 
         setMode(Mode.IDLE)
-        onWakeWord?.invoke()
+        onWakeWord?.invoke(capturedText)
     }
 
     private fun engineFailed(msg: String) {
@@ -475,7 +503,7 @@ class VoiceInteractionManager(context: Context) {
 
                     setMode(Mode.IDLE)
 
-                    onWakeWord?.invoke()
+                    onWakeWord?.invoke(hit)
                 }
             }
 

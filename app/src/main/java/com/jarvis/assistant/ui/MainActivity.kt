@@ -166,6 +166,13 @@ class MainActivity : AppCompatActivity() {
         binding.btnMicToggle.setOnClickListener { performHaptic(); listen() }
         binding.reactorView.setOnClickListener { performHaptic(); listen() }
         binding.btnSend.setOnClickListener { performHaptic(); sendTyped() }
+        binding.btnMicMute.setOnClickListener {
+            performHaptic()
+            val core = (applicationContext as? com.jarvis.assistant.JarvisApp)?.core ?: return@setOnClickListener
+            val currentMuted = core.voice.isMicMuted
+            core.setMicMuted(!currentMuted)
+            Toast.makeText(this, if (!currentMuted) "Microphone muted" else "Microphone unmuted", Toast.LENGTH_SHORT).show()
+        }
         binding.etCommandInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) { sendTyped(); true } else false
         }
@@ -384,6 +391,46 @@ class MainActivity : AppCompatActivity() {
         viewModel.listen()
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun captureAudioSample(onCaptured: (ShortArray) -> Unit) {
+        if (!hasPermission(Manifest.permission.RECORD_AUDIO)) {
+            requestMandatoryPermissions()
+            return
+        }
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val sampleRate = 16000
+            val minBuf = android.media.AudioRecord.getMinBufferSize(
+                sampleRate,
+                android.media.AudioFormat.CHANNEL_IN_MONO,
+                android.media.AudioFormat.ENCODING_PCM_16BIT
+            )
+            val audioRecord = android.media.AudioRecord(
+                android.media.MediaRecorder.AudioSource.MIC,
+                sampleRate,
+                android.media.AudioFormat.CHANNEL_IN_MONO,
+                android.media.AudioFormat.ENCODING_PCM_16BIT,
+                maxOf(minBuf, 4096) * 2
+            )
+            val buffer = ShortArray(sampleRate * 2) // 2 seconds of audio
+            try {
+                audioRecord.startRecording()
+                var readTotal = 0
+                val chunkSize = 1024
+                while (readTotal < buffer.size) {
+                    val n = audioRecord.read(buffer, readTotal, minOf(chunkSize, buffer.size - readTotal))
+                    if (n > 0) readTotal += n else break
+                }
+                audioRecord.stop()
+                audioRecord.release()
+                lifecycleScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                    onCaptured(buffer)
+                }
+            } catch (_: Exception) {
+                try { audioRecord.release() } catch (_: Exception) {}
+            }
+        }
+    }
+
     private fun sendTyped() {
         val text = binding.etCommandInput.text.toString().trim()
         if (text.isNotEmpty()) {
@@ -481,13 +528,18 @@ class MainActivity : AppCompatActivity() {
         pcHost = b.etPcHost.text.toString(),
         token = b.etToken.text.toString(),
         wakeWordEnabled = b.switchWake.isChecked,
-        floatingOrb = b.switchOrb.isChecked
+        floatingOrb = b.switchOrb.isChecked,
+        voiceAuthEnabled = b.switchVoiceAuth.isChecked,
+        voiceAuthMode = if (b.switchVoiceModeA.isChecked) "MODE_A" else "MODE_B"
     )
 
     private fun showSettings() {
         lifecycleScope.launch {
             val current = viewModel.settings.current()
             val b = DialogSettingsBinding.inflate(layoutInflater)
+            val voiceManager = (applicationContext as? com.jarvis.assistant.JarvisApp)?.core?.voice
+            val enrollment = voiceManager?.enrollmentManager
+
             b.etGeminiModel.hint = JarvisSettings.DEFAULT_GEMINI
             b.etGroqModel.hint = JarvisSettings.DEFAULT_GROQ
             b.etGeminiKey.setText(current.geminiKey)
@@ -502,6 +554,52 @@ class MainActivity : AppCompatActivity() {
             b.etToken.setText(current.token)
             b.switchWake.isChecked = current.wakeWordEnabled
             b.switchOrb.isChecked = current.floatingOrb
+            b.switchVoiceAuth.isChecked = current.voiceAuthEnabled
+            b.switchVoiceModeA.isChecked = current.voiceAuthMode == "MODE_A"
+
+            b.tvVoiceprintStatus.text = if (enrollment?.currentEmbedding?.isValid == true) {
+                "Status: Enrolled (${enrollment.currentEmbedding?.sampleCount} samples, score threshold: ${(current.speakerThreshold * 100).toInt()}%)"
+            } else {
+                "Status: No voiceprint enrolled yet."
+            }
+
+            b.btnEnrollVoiceprint.setOnClickListener {
+                enrollment?.startEnrollment()
+                fun recordNextSample(step: Int) {
+                    if (step > 3) return
+                    val phrase = when (step) {
+                        1 -> "Sample 1/3: Speak phrase 'Jarvis, this is my voice.'"
+                        2 -> "Sample 2/3: Speak phrase 'System online, voice authentication active.'"
+                        3 -> "Sample 3/3: Speak phrase 'I am the owner of this device.'"
+                        else -> ""
+                    }
+                    MaterialAlertDialogBuilder(this@MainActivity)
+                        .setTitle("Voiceprint Enrollment ($step/3)")
+                        .setMessage("$phrase\n\nTap 'Record' and speak into the microphone for 2 seconds.")
+                        .setPositiveButton("Record") { _, _ ->
+                            Toast.makeText(this@MainActivity, "Recording $step/3... Speak now!", Toast.LENGTH_SHORT).show()
+                            captureAudioSample { pcm ->
+                                val finished = enrollment?.addSample(pcm) == true
+                                if (finished) {
+                                    val currentS = enrollment?.currentEmbedding
+                                    b.tvVoiceprintStatus.text = "Status: Enrolled (${currentS?.sampleCount} samples, threshold: ${(current.speakerThreshold * 100).toInt()}%)"
+                                    Toast.makeText(this@MainActivity, "Voiceprint Enrollment Complete!", Toast.LENGTH_LONG).show()
+                                } else {
+                                    recordNextSample(step + 1)
+                                }
+                            }
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                }
+                recordNextSample(1)
+            }
+
+            b.btnDeleteVoiceprint.setOnClickListener {
+                enrollment?.deleteVoiceprint()
+                b.tvVoiceprintStatus.text = "Status: Voiceprint deleted."
+                Toast.makeText(this@MainActivity, "Enrolled voiceprint deleted.", Toast.LENGTH_SHORT).show()
+            }
 
             b.btnTestAi.setOnClickListener {
                 val typed = readSettings(b, current)

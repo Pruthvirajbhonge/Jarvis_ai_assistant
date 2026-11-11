@@ -27,9 +27,11 @@ import kotlin.math.sqrt
  */
 class VoskWakeEngine(
     private val context: Context,
-    private val onWake: () -> Unit,
+    private val onWake: (capturedText: String?) -> Unit,
     private val onStatus: (String) -> Unit,
-    private val onFailure: (String) -> Unit
+    private val onFailure: (String) -> Unit,
+    private val onSpeakerVerify: ((pcm: ShortArray) -> Boolean)? = null,
+    private val isModeA: (() -> Boolean)? = null
 ) {
     private val lock = Any()
     private var model: Model? = null
@@ -115,8 +117,17 @@ class VoskWakeEngine(
                         val json = if (rec.acceptWaveForm(buf, n)) rec.result else rec.partialResult
                         val o = JSONObject(json)
                         val text = o.optString("text").ifEmpty { o.optString("partial") }
-                        if (text.isNotEmpty() && WAKE.containsMatchIn(text)) {
+                        val matchesWake = WAKE.containsMatchIn(text)
+                        val matchesCommand = COMMAND_KEYWORDS.containsMatchIn(text) || text.length >= 8
+                        val directModeA = isModeA?.invoke() == true && matchesCommand
+
+                        if (text.isNotEmpty() && (matchesWake || directModeA)) {
+                            // Check speaker verification if configured
+                            if (onSpeakerVerify != null && !onSpeakerVerify.invoke(buf)) {
+                                continue // Reject non-owner speaker
+                            }
                             var fire = false
+                            val capturedText = text
                             synchronized(lock) {
                                 if (g == generation) {
                                     active = false
@@ -124,7 +135,7 @@ class VoskWakeEngine(
                                     fire = true
                                 }
                             }
-                            if (fire) onWake()
+                            if (fire) onWake(capturedText)
                             break
                         }
                     }
@@ -205,5 +216,9 @@ class VoskWakeEngine(
         const val MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-in-0.4.zip"
         val modelLock = Any()
         val WAKE = Regex("\\b(jarvis|jar vis|jarvish|jarves|jarvas|javis)\\b", RegexOption.IGNORE_CASE)
+        val COMMAND_KEYWORDS = Regex(
+            """\b(open|close|turn|set|call|dial|play|stop|search|show|find|volume|torch|flashlight|whatsapp|youtube|spotify|chrome|freefire|notes|camera|calculator|gallery|settings|mute|unmute|up|down|back|home|recents)\b|उघड|उघडा|चालू|चालु|बंद|बंद|कॉल|फोन|सर्च|शोधा|आवाज""",
+            RegexOption.IGNORE_CASE
+        )
     }
 }
