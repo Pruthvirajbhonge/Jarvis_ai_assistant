@@ -30,9 +30,12 @@ class VoiceEnrollmentManager(
         val model = getSpeechModel()
         val speaker = getSpeakerModel()
         Recognizer(model, 16_000f, speaker).use { recognizer ->
-            val utteranceFinished = recognizer.acceptWaveForm(pcm, pcm.size)
-            val resultJson = if (utteranceFinished) recognizer.result else recognizer.finalResult
-            val json = JSONObject(resultJson)
+            recognizer.acceptWaveForm(pcm, pcm.size)
+            val json = if (recognizer.finalResult.isNotBlank()) {
+                JSONObject(recognizer.finalResult)
+            } else {
+                JSONObject(recognizer.result)
+            }
             val frames = json.optInt("spk_frames", 0)
             val values = json.optJSONArray("spk") ?: return@withContext null
             if (frames < 50 || values.length() != 128) return@withContext null
