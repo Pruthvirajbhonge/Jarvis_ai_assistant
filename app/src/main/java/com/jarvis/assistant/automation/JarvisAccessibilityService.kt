@@ -35,6 +35,9 @@ class JarvisAccessibilityService : AccessibilityService() {
         val pkg = e.packageName?.toString() ?: return
         if (pkg == packageName || pkg == "com.android.systemui") return
         foregroundPackage = pkg
+        try {
+            (applicationContext as? com.jarvis.assistant.JarvisApp)?.core?.onForegroundPackageChanged(pkg)
+        } catch (_: Exception) {}
     }
     override fun onInterrupt() {}
 

@@ -95,6 +95,20 @@ class MainActivity : AppCompatActivity() {
         setupSettingsScreen()
         observeState()
         requestMandatoryPermissions()
+        handleSuggestionIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleSuggestionIntent(intent)
+    }
+
+    private fun handleSuggestionIntent(intent: Intent?) {
+        intent?.getStringExtra("SUGGESTION_COMMAND")?.let { cmd ->
+            intent.removeExtra("SUGGESTION_COMMAND")
+            viewModel.submit(cmd)
+        }
     }
 
     override fun onResume() {
@@ -431,6 +445,25 @@ class MainActivity : AppCompatActivity() {
         val views = listOf(binding.tvCpuMetric, binding.tvRamMetric, binding.tvDiskMetric)
         s.stats.forEachIndexed { i, st ->
             views.getOrNull(i)?.text = if (st.value == null) "${st.label}: --" else "${st.value}%"
+        }
+
+        // Proactive Suggestion Card HUD Binding
+        val suggestion = s.activeSuggestion
+        if (suggestion != null && suggestion.isValid) {
+            binding.suggestionCardLayout.visibility = View.VISIBLE
+            binding.tvSuggestionTitle.text = suggestion.title
+            binding.tvSuggestionDetail.text = suggestion.detail
+            binding.tvSuggestionPriority.text = suggestion.priority.name
+            binding.btnAcceptSuggestion.setOnClickListener {
+                performHaptic()
+                (applicationContext as? com.jarvis.assistant.JarvisApp)?.core?.acceptSuggestion(suggestion)
+            }
+            binding.btnDismissSuggestion.setOnClickListener {
+                performHaptic()
+                (applicationContext as? com.jarvis.assistant.JarvisApp)?.core?.dismissSuggestion(suggestion)
+            }
+        } else {
+            binding.suggestionCardLayout.visibility = View.GONE
         }
     }
 

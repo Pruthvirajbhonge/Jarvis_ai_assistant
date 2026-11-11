@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.jarvis.assistant.BuildConfig
@@ -37,7 +38,13 @@ data class JarvisSettings(
     val openRouterModel: String = DEFAULT_OPENROUTER,
 
     val wakeWordEnabled: Boolean = true,
-    val floatingOrb: Boolean = true
+    val floatingOrb: Boolean = true,
+
+    // Proactive Context-Aware Suggestions Settings
+    val proactiveSuggestionsEnabled: Boolean = true,
+    val suggestionDeliveryMode: String = "IN_APP", // "IN_APP", "FLOATING", "VOICE", "NOTIFICATION"
+    val maxSuggestionsPerHour: Int = 3,
+    val voiceSuggestionsEnabled: Boolean = false
 ) {
     val hasAnyAi: Boolean
         get() = listOf(geminiKey, groqKey, xaiKey, openRouterKey).any { it.isNotBlank() }
@@ -90,7 +97,11 @@ class SettingsStore(context: Context) {
                 openRouterKey = str(OR_KEY, d.openRouterKey),
                 openRouterModel = str(OR_MODEL, d.openRouterModel),
                 wakeWordEnabled = p[WAKE] ?: d.wakeWordEnabled,
-                floatingOrb = p[ORB] ?: d.floatingOrb
+                floatingOrb = p[ORB] ?: d.floatingOrb,
+                proactiveSuggestionsEnabled = p[PROACTIVE_ENABLED] ?: d.proactiveSuggestionsEnabled,
+                suggestionDeliveryMode = str(DELIVERY_MODE, d.suggestionDeliveryMode),
+                maxSuggestionsPerHour = p[MAX_SUGGESTIONS_PER_HOUR] ?: d.maxSuggestionsPerHour,
+                voiceSuggestionsEnabled = p[VOICE_SUGGESTIONS] ?: d.voiceSuggestionsEnabled
             )
         }
 
@@ -115,6 +126,10 @@ class SettingsStore(context: Context) {
             p[OR_MODEL] = s.openRouterModel.trim().ifEmpty { JarvisSettings.DEFAULT_OPENROUTER }
             p[WAKE] = s.wakeWordEnabled
             p[ORB] = s.floatingOrb
+            p[PROACTIVE_ENABLED] = s.proactiveSuggestionsEnabled
+            p[DELIVERY_MODE] = s.suggestionDeliveryMode
+            p[MAX_SUGGESTIONS_PER_HOUR] = s.maxSuggestionsPerHour
+            p[VOICE_SUGGESTIONS] = s.voiceSuggestionsEnabled
         }
     }
 
@@ -132,5 +147,9 @@ class SettingsStore(context: Context) {
         val OR_MODEL = stringPreferencesKey("openrouter_model")
         val WAKE = booleanPreferencesKey("wake_enabled")
         val ORB = booleanPreferencesKey("orb_enabled")
+        val PROACTIVE_ENABLED = booleanPreferencesKey("proactive_suggestions_enabled")
+        val DELIVERY_MODE = stringPreferencesKey("suggestion_delivery_mode")
+        val MAX_SUGGESTIONS_PER_HOUR = intPreferencesKey("max_suggestions_per_hour")
+        val VOICE_SUGGESTIONS = booleanPreferencesKey("voice_suggestions_enabled")
     }
 }

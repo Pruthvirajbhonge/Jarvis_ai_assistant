@@ -63,6 +63,15 @@ class JarvisCore(private val app: Application) {
     private val repository = JarvisRepository(settings, http) { phoneContext() }
     private val uiAgent = UiAgent(executor, repository) { msg -> _state.update { it.copy(note = msg) } }
 
+    val taskContextEngine = com.jarvis.assistant.data.engine.TaskContextEngine(app)
+    val suggestionEngine = com.jarvis.assistant.data.engine.ContextSuggestionEngine(taskContextEngine, repository) { phoneContext() }
+    val suggestionController = com.jarvis.assistant.data.engine.SuggestionController(app, settings, suggestionEngine, voice)
+    val deliveryManager = com.jarvis.assistant.data.engine.SuggestionDeliveryManager(app, voice)
+    val contextTracker = com.jarvis.assistant.automation.ActivityContextTracker { activePkg ->
+        taskContextEngine.updateTaskFromAppSwitch(activePkg)
+        suggestionController.onContextEvent(activePkg)
+    }
+
     private val socket = PcSocketClient(
         http = http,
         settings = settings,
@@ -114,6 +123,15 @@ class JarvisCore(private val app: Application) {
                 recomputeConnection()
             }
         }
+
+        scope.launch {
+            suggestionController.activeSuggestion.collect { suggestion ->
+                _state.update { it.copy(activeSuggestion = suggestion) }
+                if (suggestion != null) {
+                    deliveryManager.deliverSuggestion(suggestion, latest)
+                }
+            }
+        }
     }
 
     // ---- commands ---------------------------------------------------------------------------
@@ -121,6 +139,8 @@ class JarvisCore(private val app: Application) {
     fun handleCommand(prompt: String) {
         val text = prompt.trim()
         if (text.isEmpty()) return
+        taskContextEngine.updateTaskFromUserCommand(text, contextTracker.currentApp.value)
+        suggestionController.onContextEvent(contextTracker.currentApp.value)
         scope.launch {
             // "PC mode" / "phone mode" are handled locally so they always work, even offline.
             ModeCommand.parse(text)?.let { toPc ->
@@ -190,6 +210,24 @@ class JarvisCore(private val app: Application) {
 
     fun setPcMode(on: Boolean) {
         scope.launch { settings.setPcMode(on) }
+    }
+
+    fun acceptSuggestion(suggestion: com.jarvis.assistant.data.model.ContextSuggestion) {
+        val command = suggestionController.acceptSuggestion(suggestion)
+        handleCommand(command)
+    }
+
+    fun dismissSuggestion(suggestion: com.jarvis.assistant.data.model.ContextSuggestion) {
+        suggestionController.dismissSuggestion(suggestion)
+    }
+
+    fun clearTaskMemory() {
+        taskContextEngine.clearTaskMemory()
+        suggestionController.clearActive()
+    }
+
+    fun onForegroundPackageChanged(pkg: String) {
+        contextTracker.onForegroundPackageChanged(pkg)
     }
 
     suspend fun testAi(s: JarvisSettings): String = repository.testProviders(s)

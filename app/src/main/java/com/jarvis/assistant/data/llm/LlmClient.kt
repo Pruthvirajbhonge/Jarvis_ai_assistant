@@ -1,7 +1,9 @@
 package com.jarvis.assistant.data.llm
 
+import com.jarvis.assistant.data.model.ContextSuggestion
 import com.jarvis.assistant.data.model.JarvisJson
 import com.jarvis.assistant.data.model.PhoneAction
+import com.jarvis.assistant.data.model.SuggestionPriority
 import com.jarvis.assistant.data.model.parsePhoneAction
 import com.jarvis.assistant.data.model.str
 import com.jarvis.assistant.data.prefs.JarvisSettings
@@ -340,4 +342,60 @@ object Prompts {
         NEVER complete payments, purchases, deletions or money transfers: use fail and say the user must confirm.
         Keep "say" short and in the user's language.
     """.trimIndent()
+
+    val PROACTIVE_SUGGESTION = """
+        You are J.A.R.V.I.S., an intelligent personal AI assistant evaluating the user's current Android context.
+        Understand English, Marathi, Hindi and Romanized Marathi/Hindi.
+
+        Goal: Identify if there is a HIGH-VALUE, helpful proactive next step for the user's ongoing task or active application.
+        Do NOT generate random or annoying suggestions. If no clear, valuable suggestion exists, return priority "none".
+
+        Response Format:
+        Respond ONLY with ONE JSON object matching this structure:
+        {
+          "title": "<Short 2-4 word title>",
+          "detail": "<1 sentence clear explanation>",
+          "command": "<The exact phone voice command to run if accepted>",
+          "priority": "high" | "medium" | "low" | "none",
+          "category": "<general|software_development|media|messaging|learning|travel>",
+          "targetApp": "<App Name or null>"
+        }
+
+        Examples:
+        - If task is Android development & user is on UI layout:
+          {"title":"Next Development Step","detail":"Your Android UI is ready. Would you like to add animations and transitions?","command":"Help me add animations and transitions to the UI layout.","priority":"medium","category":"software_development","targetApp":"Android Studio"}
+        - If active app is Spotify:
+          {"title":"Sleep Timer & Volume","detail":"You are listening to Spotify. Would you like to set a 30-minute sleep timer?","command":"Set a 30 minute sleep timer for Spotify","priority":"medium","category":"media","targetApp":"Spotify"}
+        - If user switched to Instagram during a coding task:
+          {"title":"","detail":"","command":"","priority":"none","category":"general","targetApp":null}
+
+        Rules:
+        - Never invent actions or payments.
+        - Command must be an actionable phrase the assistant can process.
+        - Respect the user's preferred language.
+    """.trimIndent()
+}
+
+fun parseSuggestionOutput(text: String): ContextSuggestion? {
+    val obj = extractJsonObject(text) ?: return null
+    val title = obj.str("title").orEmpty()
+    val detail = obj.str("detail").orEmpty()
+    val command = obj.str("command").orEmpty()
+    val priorityStr = obj.str("priority").orEmpty()
+    val category = obj.str("category") ?: "general"
+    val targetApp = obj.str("targetApp", "app")
+
+    val priority = com.jarvis.assistant.data.model.SuggestionPriority.fromString(priorityStr)
+    if (priority == com.jarvis.assistant.data.model.SuggestionPriority.NONE || title.isBlank() || detail.isBlank() || command.isBlank()) {
+        return null
+    }
+
+    return com.jarvis.assistant.data.model.ContextSuggestion(
+        title = title,
+        detail = detail,
+        command = command,
+        priority = priority,
+        category = category,
+        targetApp = targetApp
+    )
 }
