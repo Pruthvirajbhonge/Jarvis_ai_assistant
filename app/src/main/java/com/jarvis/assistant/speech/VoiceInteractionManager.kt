@@ -27,7 +27,7 @@ class VoiceInteractionManager(context: Context) {
 
     companion object {
         private val WAKE_STRIP = Regex(
-            """\b(?:(?:hey|hi|ok|okay)[,\s]*)?(jarvis|jar\s*vis|jarvish|jarves|jarvas|javis|जार्विस|जर्विस|जार्वीस)\b[,.!?]*""",
+            """\b(hey|hi|ok|okay)?\s*(jarvis|jar\s*vis|jarvish|jarves|jarvas|javis|जार्विस|जर्विस|जार्वीस)\b[,.!?]*""",
             RegexOption.IGNORE_CASE
         )
 
@@ -120,9 +120,6 @@ class VoiceInteractionManager(context: Context) {
 
     fun startWake() = runOnMain {
         wakeEnabled = true
-        // Explicitly re-enabling the listener retries Vosk, but never falls back to an
-        // unauthenticated Android SpeechRecognizer session.
-        useEngine = true
 
         if (isMicMuted) {
             onError?.invoke("Microphone is muted.")
