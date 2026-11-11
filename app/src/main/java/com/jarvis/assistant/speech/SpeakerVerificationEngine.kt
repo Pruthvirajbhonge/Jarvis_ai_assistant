@@ -1,147 +1,109 @@
 package com.jarvis.assistant.speech
 
-import com.jarvis.assistant.data.model.SpeakerEmbedding
+import android.content.Context
 import com.jarvis.assistant.data.model.VerificationResult
-import kotlin.math.cos
-import kotlin.math.log10
-import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.PI
-import kotlin.math.sin
 import kotlin.math.sqrt
 
-class SpeakerVerificationEngine {
+/**
+ * Owner-voice verification based on Vosk speaker x-vectors (128-dim, one per finished utterance).
+ * Replaces the old MFCC-mean approach, which could not tell speakers apart.
+ *
+ * Enrollment: beginEnrollment() -> addSample(xvector) x N -> finishEnrollment().
+ * Verification: verify(xvector) compares against the stored owner centroid (cosine similarity).
+ */
+class SpeakerVerificationEngine(context: Context) {
 
     companion object {
-        private const val NUM_MEL_FILTERS = 20
-        private const val NUM_MFCC_COEFFS = 13
-        private const val SAMPLE_RATE = 16000
+        const val MIN_SAMPLES = 3
+        const val DEFAULT_THRESHOLD = 0.65f   // cosine similarity; tune with real scores
+        private const val PREFS = "jarvis_voiceprint"
+        private const val KEY_CENTROID = "centroid"
+        private const val KEY_THRESHOLD = "threshold"
     }
 
-    /** Extracts a 13-element MFCC feature vector from PCM 16-bit audio buffer. */
-    fun extractFeatures(pcm: ShortArray): FloatArray {
-        if (pcm.isEmpty()) return FloatArray(NUM_MFCC_COEFFS)
-        val N = pcm.size
+    private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val samples = mutableListOf<FloatArray>()
 
-        // 1. Pre-emphasis filter
-        val preEmphasized = FloatArray(N)
-        preEmphasized[0] = pcm[0].toFloat()
-        for (i in 1 until N) {
-            preEmphasized[i] = pcm[i] - 0.97f * pcm[i - 1]
+    @Volatile private var centroid: FloatArray? = loadCentroid()
+    @Volatile var threshold: Float = prefs.getFloat(KEY_THRESHOLD, DEFAULT_THRESHOLD)
+        set(value) {
+            field = value.coerceIn(0.3f, 0.95f)
+            prefs.edit().putFloat(KEY_THRESHOLD, field).apply()
         }
 
-        // 2. Hamming Window & FFT Power Spectrum
-        val real = FloatArray(N)
-        val imag = FloatArray(N)
-        for (i in 0 until N) {
-            val window = 0.54f - 0.46f * cos(2f * PI.toFloat() * i / (N - 1))
-            real[i] = preEmphasized[i] * window
-            imag[i] = 0f
-        }
+    val isEnrolled: Boolean get() = centroid != null
+    val sampleCount: Int get() = synchronized(samples) { samples.size }
 
-        // Simple DFT for power spectrum
-        val powerSpectrum = FloatArray(N / 2 + 1)
-        val numBins = N / 2 + 1
-        for (k in 0 until numBins) {
-            var sumReal = 0f
-            var sumImag = 0f
-            val step = max(1, N / 128) // Decimated DFT for efficiency
-            var idx = 0
-            while (idx < N) {
-                val angle = 2f * PI.toFloat() * k * idx / N
-                sumReal += real[idx] * cos(angle) - imag[idx] * sin(angle)
-                sumImag += real[idx] * sin(angle) + imag[idx] * cos(angle)
-                idx += step
-            }
-            powerSpectrum[k] = (sumReal * sumReal + sumImag * sumImag) / N
-        }
+    // ---- enrollment -------------------------------------------------------------------------
 
-        // 3. Mel Filter Bank
-        val melEnergies = FloatArray(NUM_MEL_FILTERS)
-        val minMel = hzToMel(0f)
-        val maxMel = hzToMel(SAMPLE_RATE / 2f)
-        val melStep = (maxMel - minMel) / (NUM_MEL_FILTERS + 1)
+    fun beginEnrollment() = synchronized(samples) { samples.clear() }
 
-        val filterCenterBins = IntArray(NUM_MEL_FILTERS + 2)
-        for (i in 0 until NUM_MEL_FILTERS + 2) {
-            val mel = minMel + i * melStep
-            val hz = melToHz(mel)
-            filterCenterBins[i] = min(numBins - 1, max(0, (hz * N / SAMPLE_RATE).toInt()))
-        }
-
-        for (m in 1..NUM_MEL_FILTERS) {
-            val left = filterCenterBins[m - 1]
-            val center = filterCenterBins[m]
-            val right = filterCenterBins[m + 1]
-            var energy = 0f
-
-            for (k in left..center) {
-                if (center != left) {
-                    val weight = (k - left).toFloat() / (center - left)
-                    energy += weight * powerSpectrum[k]
-                }
-            }
-            for (k in center..right) {
-                if (right != center) {
-                    val weight = (right - k).toFloat() / (right - center)
-                    energy += weight * powerSpectrum[k]
-                }
-            }
-            melEnergies[m - 1] = log10(max(1e-5f, energy))
-        }
-
-        // 4. Discrete Cosine Transform (DCT) for MFCCs
-        val mfccs = FloatArray(NUM_MFCC_COEFFS)
-        for (i in 0 until NUM_MFCC_COEFFS) {
-            var sum = 0f
-            for (j in 0 until NUM_MEL_FILTERS) {
-                sum += melEnergies[j] * cos(PI.toFloat() * i * (j + 0.5f) / NUM_MEL_FILTERS)
-            }
-            mfccs[i] = sum
-        }
-
-        // Normalize vector
-        var norm = 0f
-        for (v in mfccs) norm += v * v
-        norm = sqrt(max(1e-6f, norm))
-        for (i in mfccs.indices) mfccs[i] /= norm
-
-        return mfccs
+    fun addSample(xvector: FloatArray) {
+        synchronized(samples) { samples.add(l2(xvector)) }
     }
 
-    /** Verifies live audio PCM buffer against enrolled owner embedding. */
-    fun verify(pcm: ShortArray, ownerEmbedding: SpeakerEmbedding): VerificationResult {
-        if (!ownerEmbedding.isValid || ownerEmbedding.centroids.isEmpty()) {
-            return VerificationResult(isMatched = false, confidenceScore = 0f, reason = "No Voiceprint Enrolled")
-        }
+    /**
+     * Builds the owner centroid. Returns the WORST self-similarity among the samples
+     * (low value = inconsistent recordings, e.g. noise or another speaker), or null if
+     * there were not enough samples.
+     */
+    fun finishEnrollment(): Float? {
+        val snapshot = synchronized(samples) { samples.toList() }
+        if (snapshot.size < MIN_SAMPLES) return null
+        val dim = snapshot[0].size
+        val mean = FloatArray(dim)
+        for (s in snapshot) for (i in 0 until dim) mean[i] += s[i] / snapshot.size
+        val c = l2(mean)
+        val worst = snapshot.minOf { cosine(it, c) }
+        centroid = c
+        prefs.edit().putString(KEY_CENTROID, c.joinToString(",")).apply()
+        return worst
+    }
 
-        val features = extractFeatures(pcm)
-        val score = computeCosineSimilarity(features, ownerEmbedding.centroids.toFloatArray())
-        val isMatched = score >= ownerEmbedding.threshold
+    fun clearEnrollment() {
+        centroid = null
+        synchronized(samples) { samples.clear() }
+        prefs.edit().remove(KEY_CENTROID).apply()
+    }
 
+    // ---- verification -----------------------------------------------------------------------
+
+    fun verify(xvector: FloatArray): VerificationResult {
+        val owner = centroid
+            ?: return VerificationResult(isMatched = false, confidenceScore = 0f, reason = "No Voiceprint Enrolled")
+        val score = cosine(l2(xvector), owner)
+        val ok = score >= threshold
+        val pct = (score * 100).toInt()
         return VerificationResult(
-            isMatched = isMatched,
+            isMatched = ok,
             confidenceScore = score,
-            reason = if (isMatched) "Owner Voice Verified (${(score * 100).toInt()}%)" else "Unverified Speaker (${(score * 100).toInt()}%)"
+            reason = if (ok) "Owner Voice Verified ($pct%)" else "Unverified Speaker ($pct%, need ${(threshold * 100).toInt()}%)"
         )
     }
 
-    /** Computes Cosine Similarity between two normalized feature vectors. */
-    fun computeCosineSimilarity(vecA: FloatArray, vecB: FloatArray): Float {
-        if (vecA.isEmpty() || vecB.isEmpty()) return 0f
-        val len = min(vecA.size, vecB.size)
-        var dot = 0f
-        var normA = 0f
-        var normB = 0f
-        for (i in 0 until len) {
-            dot += vecA[i] * vecB[i]
-            normA += vecA[i] * vecA[i]
-            normB += vecB[i] * vecB[i]
-        }
-        if (normA == 0f || normB == 0f) return 0f
-        return (dot / (sqrt(normA) * sqrt(normB))).coerceIn(0f, 1f)
+    // ---- math -------------------------------------------------------------------------------
+
+    fun cosine(a: FloatArray, b: FloatArray): Float {
+        val len = min(a.size, b.size)
+        if (len == 0) return 0f
+        var dot = 0f; var na = 0f; var nb = 0f
+        for (i in 0 until len) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i] }
+        if (na == 0f || nb == 0f) return 0f
+        return dot / (sqrt(na) * sqrt(nb))
     }
 
-    private fun hzToMel(hz: Float): Float = 2595f * log10(1f + hz / 700f)
-    private fun melToHz(mel: Float): Float = 700f * (Math.pow(10.0, (mel / 2595f).toDouble()).toFloat() - 1f)
+    private fun l2(v: FloatArray): FloatArray {
+        var n = 0f
+        for (x in v) n += x * x
+        n = sqrt(n).coerceAtLeast(1e-9f)
+        return FloatArray(v.size) { v[it] / n }
+    }
+
+    private fun loadCentroid(): FloatArray? =
+        prefs.getString(KEY_CENTROID, null)
+            ?.split(",")
+            ?.mapNotNull { it.toFloatOrNull() }
+            ?.takeIf { it.isNotEmpty() }
+            ?.toFloatArray()
 }

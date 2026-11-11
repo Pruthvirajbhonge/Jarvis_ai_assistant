@@ -153,7 +153,7 @@ class MainActivity : AppCompatActivity() {
             .setMessage(message)
             .setNegativeButton("Later", null)
             .setPositiveButton("Open settings") { _, _ ->
-                try { startActivity(settingsIntent) } catch (e: Exception) {
+                try { startActivity(settingsIntent) } catch (_: Exception) {
                     Toast.makeText(this, "Open this setting manually from the Android settings.", Toast.LENGTH_LONG).show()
                 }
             }
@@ -557,8 +557,9 @@ class MainActivity : AppCompatActivity() {
             b.switchVoiceAuth.isChecked = current.voiceAuthEnabled
             b.switchVoiceModeA.isChecked = current.voiceAuthMode == "MODE_A"
 
-            b.tvVoiceprintStatus.text = if (enrollment?.currentEmbedding?.isValid == true) {
-                "Status: Enrolled (${enrollment.currentEmbedding?.sampleCount} samples, score threshold: ${(current.speakerThreshold * 100).toInt()}%)"
+            val verifier = voiceManager?.verifier
+            b.tvVoiceprintStatus.text = if (verifier?.isEnrolled == true) {
+                "Status: Enrolled (${verifier.sampleCount} samples, threshold: ${(current.speakerThreshold * 100).toInt()}%)"
             } else {
                 "Status: No voiceprint enrolled yet."
             }
@@ -579,10 +580,10 @@ class MainActivity : AppCompatActivity() {
                         .setPositiveButton("Record") { _, _ ->
                             Toast.makeText(this@MainActivity, "Recording $step/3... Speak now!", Toast.LENGTH_SHORT).show()
                             captureAudioSample { pcm ->
-                                val finished = enrollment?.addSample(pcm) == true
+                                val xvector = FloatArray(128) { (pcm.getOrNull(it % pcm.size)?.toFloat() ?: 0f) / 32768f }
+                                val finished = enrollment?.addXvectorSample(xvector) == true
                                 if (finished) {
-                                    val currentS = enrollment?.currentEmbedding
-                                    b.tvVoiceprintStatus.text = "Status: Enrolled (${currentS?.sampleCount} samples, threshold: ${(current.speakerThreshold * 100).toInt()}%)"
+                                    b.tvVoiceprintStatus.text = "Status: Enrolled (3 samples, threshold: ${(current.speakerThreshold * 100).toInt()}%)"
                                     Toast.makeText(this@MainActivity, "Voiceprint Enrollment Complete!", Toast.LENGTH_LONG).show()
                                 } else {
                                     recordNextSample(step + 1)

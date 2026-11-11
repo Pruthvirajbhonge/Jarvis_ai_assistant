@@ -47,8 +47,8 @@ class VoiceInteractionManager(context: Context) {
     // Vosk continuous wake engine.
     private var useEngine = true
 
+    val verifier = SpeakerVerificationEngine(appContext)
     val enrollmentManager = VoiceEnrollmentManager(appContext)
-    val verifier = SpeakerVerificationEngine()
     @Volatile var isMicMuted: Boolean = false
     var isModeASupplier: (() -> Boolean)? = null
 
@@ -63,18 +63,7 @@ class VoiceInteractionManager(context: Context) {
         onFailure = { msg ->
             main.post { engineFailed(msg) }
         },
-        onSpeakerVerify = { pcm ->
-            val embedding = enrollmentManager.currentEmbedding
-            if (embedding == null || !embedding.isValid) {
-                true
-            } else {
-                val res = verifier.verify(pcm, embedding)
-                if (!res.isMatched) {
-                    main.post { onError?.invoke("Access Denied: ${res.reason}") }
-                }
-                res.isMatched
-            }
-        },
+        speakerEngine = verifier,
         isModeA = { isModeASupplier?.invoke() == true }
     )
 
