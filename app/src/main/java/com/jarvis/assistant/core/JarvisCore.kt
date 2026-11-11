@@ -119,8 +119,8 @@ class JarvisCore(private val app: Application) {
         voice.onTranscript = { handleCommand(it) }
         voice.onError = { msg -> _state.update { it.copy(note = msg) } }
         BackgroundLauncher.onBlocked = { label ->
-            val msg = "Android blocked opening $label in the background, sir. Please allow 'Display over other apps' in Jarvis Settings."
-            _state.update { it.copy(reply = msg, note = "Blocked: allow 'Display over other apps' permission to open $label") }
+            val msg = "Android blocked opening $label in the background, sir. Tap the notification."
+            _state.update { it.copy(reply = msg, note = "Blocked: tap the notification to open $label") }
             voice.speak(msg)
         }
 
@@ -197,7 +197,7 @@ class JarvisCore(private val app: Application) {
                 val outcome = runAction(action) // really changes the phone
                 executed = outcome
                 // Hardware actions are confirmed with what REALLY happened, not what the AI claimed.
-                spoken = if (isUiTask || hardware.handles(action.action) || action.action.equals("open_app", true) || spoken.isBlank()) outcome else spoken
+                spoken = if (isUiTask || hardware.handles(action.action) || spoken.isBlank()) outcome else spoken
             }
             if (spoken.isBlank()) spoken = "No response."
             _state.update { it.copy(busy = false, reply = spoken, lastAction = executed, note = result.note) }
