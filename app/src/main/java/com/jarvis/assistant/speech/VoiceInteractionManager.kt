@@ -284,13 +284,11 @@ class VoiceInteractionManager(context: Context) {
     }
 
     private fun engineFailed(msg: String) {
-        // Keep owner verification fail-closed, but do not permanently disable the
-        // background listener after a transient AudioRecord/model error.
+        // Fail closed. SpeechRecognizer has no speaker x-vector, so falling back to it
+        // would bypass owner verification. Keep the mic stopped until Vosk is available.
+        useEngine = false
         setMode(Mode.IDLE)
-        onError?.invoke("$msg Voice listener will retry; owner verification remains enabled.")
-        if (wakeEnabled && !isMicMuted && !speaking) {
-            scheduleWake(2_000L)
-        }
+        onError?.invoke("$msg Owner verification is unavailable; voice commands are disabled.")
     }
 
     // --------------------------------------------------
