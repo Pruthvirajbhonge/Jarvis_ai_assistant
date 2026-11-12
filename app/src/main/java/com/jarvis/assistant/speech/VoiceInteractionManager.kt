@@ -39,6 +39,7 @@ class VoiceInteractionManager(context: Context) {
     private var commandTimeoutRunnable: Runnable? = null
 
     private val COMMAND_START_TIMEOUT = 12_000L
+    private val MAX_ENGINE_RETRIES = 3
 
     // Silence detection hints for SpeechRecognizer.
     private val commandCompleteSilence = 1_500L
@@ -60,8 +61,8 @@ class VoiceInteractionManager(context: Context) {
         onStatus = { msg ->
             main.post { onError?.invoke(msg) }
         },
-        onFailure = { msg ->
-            main.post { engineFailed(msg) }
+        onFailure = { msg, retryable ->
+            main.post { engineFailed(msg, retryable) }
         },
         speakerEngine = verifier,
         isModeA = { isModeASupplier?.invoke() == true }
@@ -104,6 +105,7 @@ class VoiceInteractionManager(context: Context) {
 
     fun startWake() = runOnMain {
         wakeEnabled = true
+        engineRetries = 0
 
         if (isMicMuted) {
             onError?.invoke("Microphone is muted.")
@@ -247,19 +249,35 @@ class VoiceInteractionManager(context: Context) {
 
     private fun onEngineWake(capturedText: String? = null) {
         if (mode != Mode.WAKE) return
+        engineRetries = 0
 
         setMode(Mode.IDLE)
         onWakeWord?.invoke(capturedText)
     }
 
-    private fun engineFailed(msg: String) {
-        useEngine = false
+    private var engineRetries = 0
 
-        onError?.invoke("$msg Using basic wake mode.")
+    /**
+     * The OLD version switched to SpeechRecognizer and looped it forever: every restart made the
+     * system "beep" and flicker the mic indicator, and it bypassed the owner-voice check.
+     * Now: retry the Vosk engine a few times with a growing delay, then stop quietly.
+     */
+    private fun engineFailed(msg: String, retryable: Boolean) {
+        if (mode == Mode.WAKE) setMode(Mode.IDLE)
+        if (!wakeEnabled) return
 
-        if (wakeEnabled && mode != Mode.COMMAND && !speaking) {
-            beginRecognition(Mode.WAKE)
+        if (retryable && engineRetries < MAX_ENGINE_RETRIES) {
+            engineRetries++
+            onError?.invoke("$msg Retrying ($engineRetries/$MAX_ENGINE_RETRIES)…")
+            scheduleWake(3_000L * engineRetries)
+            return
         }
+
+        wakeEnabled = false
+        onError?.invoke(
+            if (retryable) "$msg Wake listening stopped. Turn wake word off and on to retry."
+            else msg
+        )
     }
 
     // --------------------------------------------------

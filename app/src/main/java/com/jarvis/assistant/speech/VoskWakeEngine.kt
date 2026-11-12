@@ -60,7 +60,8 @@ class VoskWakeEngine(
     private val context: Context,
     private val onWake: (capturedText: String?) -> Unit,
     private val onStatus: (String) -> Unit,
-    private val onFailure: (String) -> Unit,
+    /** (message, retryable). retryable=false means retrying cannot help (e.g. not enrolled). */
+    private val onFailure: (String, Boolean) -> Unit,
     private val speakerEngine: SpeakerVerificationEngine? = null,
     private val isModeA: (() -> Boolean)? = null
 ) {
@@ -69,15 +70,20 @@ class VoskWakeEngine(
     private var spkModel: SpeakerModel? = null
     private var active = false
     @Volatile private var generation = 0
+    private var worker: Thread? = null
 
     fun start() {
         val g: Int
+        val prev: Thread?
         synchronized(lock) {
             if (active) return
             active = true
             g = ++generation
+            prev = worker
         }
-        Thread({ runLoop(g) }, "jarvis-wake").start()
+        val t = Thread({ runLoop(g, prev) }, "jarvis-wake")
+        synchronized(lock) { worker = t }
+        t.start()
     }
 
     fun stop() {
@@ -88,12 +94,17 @@ class VoskWakeEngine(
     }
 
     @SuppressLint("MissingPermission")
-    private fun runLoop(g: Int) {
+    private fun runLoop(g: Int, prev: Thread?) {
+        var retryable = true
         try {
-            // Fail closed: never accept everyone.
+            // Fail closed: never accept everyone. Retrying cannot fix this.
             if (speakerEngine != null && !speakerEngine.isEnrolled) {
-                throw IllegalStateException("Owner voice is not enrolled. Enroll your voice first.")
+                retryable = false
+                throw IllegalStateException("Owner voice is not enrolled. Enroll your voice in Settings.")
             }
+            // Wait for the previous loop to release the microphone (stop() is asynchronous).
+            // Without this, a quick stop()->start() finds the mic busy and fails.
+            try { prev?.join(2000) } catch (_: InterruptedException) {}
             val m = ensureModel()
             val spk = if (speakerEngine != null) ensureSpeakerModel() else null
             if (g != generation) return
@@ -101,15 +112,19 @@ class VoskWakeEngine(
             val minBuf = AudioRecord.getMinBufferSize(
                 SAMPLE_RATE.toInt(), AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
             )
-            val audio = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION, SAMPLE_RATE.toInt(),
-                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
-                maxOf(minBuf, 4096) * 4
-            )
-            if (audio.state != AudioRecord.STATE_INITIALIZED) {
-                audio.release()
-                throw IllegalStateException("Microphone is not available.")
+            var audio: AudioRecord? = null
+            for (attempt in 1..4) { // mic may still be held for a moment by the system recognizer / TTS
+                val a = AudioRecord(
+                    MediaRecorder.AudioSource.VOICE_RECOGNITION, SAMPLE_RATE.toInt(),
+                    AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
+                    maxOf(minBuf, 4096) * 4
+                )
+                if (a.state == AudioRecord.STATE_INITIALIZED) { audio = a; break }
+                a.release()
+                if (g != generation) return
+                Thread.sleep(400)
             }
+            if (audio == null) throw IllegalStateException("Microphone is busy.")
 
             val agc = AdaptiveGain()
             val rec = if (spk != null) Recognizer(m, SAMPLE_RATE, spk) else Recognizer(m, SAMPLE_RATE)
@@ -173,7 +188,7 @@ class VoskWakeEngine(
                     generation++
                 }
             }
-            onFailure(e.message ?: "Wake engine failed.")
+            onFailure(e.message ?: "Wake engine failed.", retryable)
         }
     }
 

@@ -37,6 +37,7 @@ import com.jarvis.assistant.databinding.ActivityMainBinding
 import com.jarvis.assistant.databinding.DialogSettingsBinding
 import com.jarvis.assistant.service.JarvisBackgroundService
 import com.jarvis.assistant.speech.VoiceInteractionManager.Mode
+import com.jarvis.assistant.speech.SpeakerEnroller
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -564,37 +565,31 @@ class MainActivity : AppCompatActivity() {
                 "Status: No voiceprint enrolled yet."
             }
 
+
             b.btnEnrollVoiceprint.setOnClickListener {
-                enrollment?.startEnrollment()
-                fun recordNextSample(step: Int) {
-                    if (step > 3) return
-                    val phrase = when (step) {
-                        1 -> "Sample 1/3: Speak phrase 'Jarvis, this is my voice.'"
-                        2 -> "Sample 2/3: Speak phrase 'System online, voice authentication active.'"
-                        3 -> "Sample 3/3: Speak phrase 'I am the owner of this device.'"
-                        else -> ""
-                    }
-                    MaterialAlertDialogBuilder(this@MainActivity)
-                        .setTitle("Voiceprint Enrollment ($step/3)")
-                        .setMessage("$phrase\n\nTap 'Record' and speak into the microphone for 2 seconds.")
-                        .setPositiveButton("Record") { _, _ ->
-                            Toast.makeText(this@MainActivity, "Recording $step/3... Speak now!", Toast.LENGTH_SHORT).show()
-                            captureAudioSample { pcm ->
-                                val xvector = FloatArray(128) { (pcm.getOrNull(it % pcm.size)?.toFloat() ?: 0f) / 32768f }
-                                val finished = enrollment?.addXvectorSample(xvector) == true
-                                if (finished) {
-                                    b.tvVoiceprintStatus.text = "Status: Enrolled (3 samples, threshold: ${(current.speakerThreshold * 100).toInt()}%)"
-                                    Toast.makeText(this@MainActivity, "Voiceprint Enrollment Complete!", Toast.LENGTH_LONG).show()
-                                } else {
-                                    recordNextSample(step + 1)
-                                }
-                            }
+                val vm = voiceManager ?: return@setOnClickListener
+                val v = vm.verifier
+                vm.stopWake() // microphone must be free for enrollment
+                b.tvVoiceprintStatus.text = "Say 5 phrases, e.g. \"Jarvis open camera\"…"
+                SpeakerEnroller(
+                    context = applicationContext,
+                    engine = v,
+                    onProgress = { done: Int, total: Int, heard: String ->
+                        runOnUiThread { b.tvVoiceprintStatus.text = "Recorded $done/$total (\"$heard\"). Say the next phrase." }
+                    },
+                    onStatus = { msg: String ->
+                        runOnUiThread { if (msg.isNotBlank()) b.tvVoiceprintStatus.text = msg }
+                    },
+                    onDone = { ok: Boolean, msg: String ->
+                        runOnUiThread {
+                            b.tvVoiceprintStatus.text = "Status: $msg"
+                            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                            if (ok && current.wakeWordEnabled) vm.startWake()
                         }
-                        .setNegativeButton("Cancel", null)
-                        .show()
-                }
-                recordNextSample(1)
+                    }
+                ).start()
             }
+
 
             b.btnDeleteVoiceprint.setOnClickListener {
                 enrollment?.deleteVoiceprint()
