@@ -52,6 +52,7 @@ class VoiceInteractionManager(context: Context) {
     val enrollmentManager = VoiceEnrollmentManager(appContext)
     @Volatile var isMicMuted: Boolean = false
     var isModeASupplier: (() -> Boolean)? = null
+    var isVoiceAuthEnabledSupplier: (() -> Boolean)? = null
 
     private val engine = VoskWakeEngine(
         context = appContext,
@@ -65,7 +66,8 @@ class VoiceInteractionManager(context: Context) {
             main.post { engineFailed(msg, retryable) }
         },
         speakerEngine = verifier,
-        isModeA = { isModeASupplier?.invoke() == true }
+        isModeA = { isModeASupplier?.invoke() == true },
+        isVoiceAuthEnabled = { isVoiceAuthEnabledSupplier?.invoke() == true }
     )
 
     @Volatile

@@ -63,7 +63,8 @@ class VoskWakeEngine(
     /** (message, retryable). retryable=false means retrying cannot help (e.g. not enrolled). */
     private val onFailure: (String, Boolean) -> Unit,
     private val speakerEngine: SpeakerVerificationEngine? = null,
-    private val isModeA: (() -> Boolean)? = null
+    private val isModeA: (() -> Boolean)? = null,
+    private val isVoiceAuthEnabled: (() -> Boolean)? = null
 ) {
     private val lock = Any()
     private var model: Model? = null
@@ -96,9 +97,10 @@ class VoskWakeEngine(
     @SuppressLint("MissingPermission")
     private fun runLoop(g: Int, prev: Thread?) {
         var retryable = true
+        val authActive = isVoiceAuthEnabled?.invoke() == true
         try {
-            // Fail closed: never accept everyone. Retrying cannot fix this.
-            if (speakerEngine != null && !speakerEngine.isEnrolled) {
+            // Fail closed only when voice auth is enabled: never accept everyone when auth is ON but not enrolled.
+            if (authActive && speakerEngine != null && !speakerEngine.isEnrolled) {
                 retryable = false
                 throw IllegalStateException("Owner voice is not enrolled. Enroll your voice in Settings.")
             }
@@ -106,7 +108,7 @@ class VoskWakeEngine(
             // Without this, a quick stop()->start() finds the mic busy and fails.
             try { prev?.join(2000) } catch (_: InterruptedException) {}
             val m = ensureModel()
-            val spk = if (speakerEngine != null) ensureSpeakerModel() else null
+            val spk = if (authActive && speakerEngine != null) ensureSpeakerModel() else null
             if (g != generation) return
 
             val minBuf = AudioRecord.getMinBufferSize(
@@ -152,7 +154,7 @@ class VoskWakeEngine(
                             (modeA && COMMAND_KEYWORDS.containsMatchIn(text))
                         if (!accepted) continue
 
-                        if (speakerEngine != null) {
+                        if (authActive && speakerEngine != null) {
                             val arr = o.optJSONArray("spk")
                             val frames = o.optInt("spk_frames", 0)
                             if (arr == null || frames < MIN_SPK_FRAMES) {

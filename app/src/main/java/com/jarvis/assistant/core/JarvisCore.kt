@@ -125,6 +125,7 @@ class JarvisCore(private val app: Application) {
         }
 
         voice.isModeASupplier = { latest.voiceAuthEnabled && latest.voiceAuthMode == "MODE_A" }
+        voice.isVoiceAuthEnabledSupplier = { latest.voiceAuthEnabled }
 
         // Mirror persisted settings into the UI state (works even before the service starts).
         scope.launch {
