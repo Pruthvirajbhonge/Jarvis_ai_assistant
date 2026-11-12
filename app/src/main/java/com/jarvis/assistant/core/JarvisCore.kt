@@ -63,6 +63,15 @@ class JarvisCore(private val app: Application) {
     private val repository = JarvisRepository(settings, http) { phoneContext() }
     private val uiAgent = UiAgent(executor, repository) { msg -> _state.update { it.copy(note = msg) } }
 
+    val taskContextEngine = com.jarvis.assistant.data.engine.TaskContextEngine(app)
+    val suggestionEngine = com.jarvis.assistant.data.engine.ContextSuggestionEngine(taskContextEngine, repository) { phoneContext() }
+    val suggestionController = com.jarvis.assistant.data.engine.SuggestionController(app, settings, suggestionEngine, voice)
+    val deliveryManager = com.jarvis.assistant.data.engine.SuggestionDeliveryManager(app, voice)
+    val contextTracker = com.jarvis.assistant.automation.ActivityContextTracker { activePkg ->
+        taskContextEngine.updateTaskFromAppSwitch(activePkg)
+        suggestionController.onContextEvent(activePkg)
+    }
+
     private val socket = PcSocketClient(
         http = http,
         settings = settings,
@@ -93,25 +102,46 @@ class JarvisCore(private val app: Application) {
             "Yes, I'm listening."
         )
 
-        voice.onWakeWord = {
+        voice.onWakeWord = { capturedText ->
             wakeScreen()
-            val greeting = wakeGreetings.random()
-            voice.speakThenCommand(greeting)
+            val cleanCmd = capturedText?.lowercase()?.trim()
+                ?.removePrefix("hey")?.removePrefix("jarvis")
+                ?.removePrefix("hi")?.removePrefix("direct")
+                ?.trim()
+
+            if (!cleanCmd.isNullOrBlank() && cleanCmd.length >= 3) {
+                handleCommand(cleanCmd)
+            } else {
+                val greeting = wakeGreetings.random()
+                voice.speakThenCommand(greeting)
+            }
         }
         voice.onTranscript = { handleCommand(it) }
         voice.onError = { msg -> _state.update { it.copy(note = msg) } }
         BackgroundLauncher.onBlocked = { label ->
-            val msg = "Android blocked opening $label in the background, sir. Please allow 'Display over other apps' in Jarvis Settings."
-            _state.update { it.copy(reply = msg, note = "Blocked: allow 'Display over other apps' permission to open $label") }
+            val msg = "Android blocked opening $label in the background, sir. Tap the notification."
+            _state.update { it.copy(reply = msg, note = "Blocked: tap the notification to open $label") }
             voice.speak(msg)
         }
+
+        voice.isModeASupplier = { latest.voiceAuthEnabled && latest.voiceAuthMode == "MODE_A" }
 
         // Mirror persisted settings into the UI state (works even before the service starts).
         scope.launch {
             settings.flow.collect { s ->
                 latest = s
+                voice.isMicMuted = s.micHardwareMuted
                 _state.update { it.copy(pcMode = s.pcMode) }
                 recomputeConnection()
+            }
+        }
+
+        scope.launch {
+            suggestionController.activeSuggestion.collect { suggestion ->
+                _state.update { it.copy(activeSuggestion = suggestion) }
+                if (suggestion != null) {
+                    deliveryManager.deliverSuggestion(suggestion, latest)
+                }
             }
         }
     }
@@ -121,6 +151,8 @@ class JarvisCore(private val app: Application) {
     fun handleCommand(prompt: String) {
         val text = prompt.trim()
         if (text.isEmpty()) return
+        taskContextEngine.updateTaskFromUserCommand(text, contextTracker.currentApp.value)
+        suggestionController.onContextEvent(contextTracker.currentApp.value)
         scope.launch {
             // "PC mode" / "phone mode" are handled locally so they always work, even offline.
             ModeCommand.parse(text)?.let { toPc ->
@@ -165,7 +197,7 @@ class JarvisCore(private val app: Application) {
                 val outcome = runAction(action) // really changes the phone
                 executed = outcome
                 // Hardware actions are confirmed with what REALLY happened, not what the AI claimed.
-                spoken = if (isUiTask || hardware.handles(action.action) || action.action.equals("open_app", true) || spoken.isBlank()) outcome else spoken
+                spoken = if (isUiTask || hardware.handles(action.action) || spoken.isBlank()) outcome else spoken
             }
             if (spoken.isBlank()) spoken = "No response."
             _state.update { it.copy(busy = false, reply = spoken, lastAction = executed, note = result.note) }
@@ -190,6 +222,31 @@ class JarvisCore(private val app: Application) {
 
     fun setPcMode(on: Boolean) {
         scope.launch { settings.setPcMode(on) }
+    }
+
+    fun acceptSuggestion(suggestion: com.jarvis.assistant.data.model.ContextSuggestion) {
+        val command = suggestionController.acceptSuggestion(suggestion)
+        handleCommand(command)
+    }
+
+    fun dismissSuggestion(suggestion: com.jarvis.assistant.data.model.ContextSuggestion) {
+        suggestionController.dismissSuggestion(suggestion)
+    }
+
+    fun clearTaskMemory() {
+        taskContextEngine.clearTaskMemory()
+        suggestionController.clearActive()
+    }
+
+    fun onForegroundPackageChanged(pkg: String) {
+        contextTracker.onForegroundPackageChanged(pkg)
+    }
+
+    fun setMicMuted(muted: Boolean) {
+        voice.isMicMuted = muted
+        scope.launch { settings.setMicMuted(muted) }
+        val msg = if (muted) "Microphone muted, sir." else "Microphone unmuted, sir."
+        _state.update { it.copy(note = msg) }
     }
 
     suspend fun testAi(s: JarvisSettings): String = repository.testProviders(s)

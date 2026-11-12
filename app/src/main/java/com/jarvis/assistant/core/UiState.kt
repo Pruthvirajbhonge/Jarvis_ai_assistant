@@ -16,5 +16,6 @@ data class UiState(
     val audioRms: Float = 0f,
     /** Result of the last phone action that was really executed (volume, torch, call...). */
     val lastAction: String? = null,
-    val stats: List<Stat> = listOf(Stat("BAT", null), Stat("RAM", null), Stat("DISK", null))
+    val stats: List<Stat> = listOf(Stat("BAT", null), Stat("RAM", null), Stat("DISK", null)),
+    val activeSuggestion: com.jarvis.assistant.data.model.ContextSuggestion? = null
 )

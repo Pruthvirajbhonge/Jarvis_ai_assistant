@@ -106,6 +106,21 @@ class JarvisRepository(
         return chain.complete(providers, system, emptyList(), user).text
     }
 
+    suspend fun evaluateSuggestion(contextPrompt: String): com.jarvis.assistant.data.model.ContextSuggestion? {
+        val s = settings.current()
+        if (s.pcMode) return null
+        val providers = s.buildProviders(llmHttp)
+        if (providers.isEmpty()) return null
+        return try {
+            val text = chain.complete(providers, Prompts.PROACTIVE_SUGGESTION, historySnapshot(), contextPrompt).text
+            com.jarvis.assistant.data.llm.parseSuggestionOutput(text)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** Pings every configured provider with the given (possibly unsaved) settings. */
     suspend fun testProviders(s: JarvisSettings): String {
         val providers = s.buildProviders(llmHttp)

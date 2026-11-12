@@ -1,4 +1,13 @@
 # Project exclude paths
 /.gradle/
+/build/
 /app/build/
 /app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/
+
+# Local configuration file (contains local SDK path & sensitive info)
+local.properties
+
+# IDE & Editor files
+.idea/
+*.iml
+.DS_Store

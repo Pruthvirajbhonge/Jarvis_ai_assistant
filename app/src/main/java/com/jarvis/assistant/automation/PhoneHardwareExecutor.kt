@@ -81,9 +81,28 @@ class PhoneHardwareExecutor(context: Context) {
         return parseTorch(t) ?: parseVolume(t) ?: parseCall(raw.trim()) ?: parseCloseApp(raw.trim()) ?: parseAppLaunch(raw.trim())
     }
 
-    /** Lower-cases and converts Devanagari digits (८०) to ASCII (80). */
-    private fun normalize(s: String): String = buildString {
-        for (c in s.lowercase().trim()) append(if (c in '\u0966'..'\u096F') '0' + (c - '\u0966') else c)
+    /** Lower-cases, converts Devanagari digits (८०) to ASCII (80), and transliterates common Devanagari voice keywords. */
+    private fun normalize(s: String): String {
+        val asciiDigits = buildString {
+            for (c in s.lowercase().trim()) append(if (c in '\u0966'..'\u096F') '0' + (c - '\u0966') else c)
+        }
+        var result = asciiDigits
+        val transliterations = mapOf(
+            "ओपन" to "open", "उघडा" to "open", "उघड" to "open", "खोलो" to "open",
+            "व्हाट्सएप" to "whatsapp", "व्हॉट्सॲप" to "whatsapp", "व्हाट्सॲप" to "whatsapp",
+            "यूट्यूब" to "youtube", "युट्यूब" to "youtube",
+            "क्रोम" to "chrome",
+            "वॉल्यूम" to "volume", "व्हॉल्यूम" to "volume", "आवाज" to "volume",
+            "टॉर्च" to "torch", "टोर्च" to "torch", "फ्लॅशलाइट" to "torch", "फ्लॅशलाईट" to "torch",
+            "कॉल" to "call", "फोन" to "call",
+            "बंद" to "close", "बन्द" to "close"
+        )
+        for ((devanagari, english) in transliterations) {
+            if (result.contains(devanagari)) {
+                result = result.replace(devanagari, english)
+            }
+        }
+        return result
     }
 
     private fun act(name: String, vararg kv: Pair<String, Any>) = PhoneAction(
@@ -175,7 +194,7 @@ class PhoneHardwareExecutor(context: Context) {
                     else -> Outcome("What volume level should I set, sir?", false)
                 }
             }
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
             Outcome("The phone didn't allow me to change the volume.", false)
         } catch (e: Exception) {
             Outcome("I couldn't change the volume: ${e.message}", false)
@@ -220,9 +239,9 @@ class PhoneHardwareExecutor(context: Context) {
             camera.setTorchMode(id, want)
             torchStates[id] = want
             Outcome(if (want) "Flashlight on." else "Flashlight off.", true)
-        } catch (e: CameraAccessException) {
+        } catch (_: CameraAccessException) {
             Outcome("I couldn't reach the flashlight. Another app may be using the camera.", false)
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             Outcome("This phone's flashlight can't be controlled.", false)
         }
     }
@@ -269,9 +288,9 @@ class PhoneHardwareExecutor(context: Context) {
                 val telecom = app.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
                 telecom.placeCall(Uri.fromParts("tel", number, null), Bundle())
                 return Outcome("Calling $display.", true)
-            } catch (e: SecurityException) {
+            } catch (_: SecurityException) {
                 // fall back to the intent below
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // fall back to the intent below
             }
         }
@@ -284,7 +303,7 @@ class PhoneHardwareExecutor(context: Context) {
             BackgroundLauncher.start(app, intent, display)
             if (canCall) Outcome("Calling $display.", true)
             else Outcome("Opened the dialer for $display. Allow the Phone permission so I can call directly.", false)
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
             Outcome("The phone blocked the call. Please allow the Phone permission.", false)
         } catch (e: Exception) {
             Outcome("I couldn't place the call: ${e.message}", false)
@@ -386,7 +405,20 @@ class PhoneHardwareExecutor(context: Context) {
     private fun openApp(name: String?): Outcome {
         if (name.isNullOrBlank()) return Outcome("Which app should I open?", false)
         val pm = app.packageManager
-        val launch = findLaunchIntent(pm, name)
+        val launch: Intent? = if (name.contains('.')) {
+            pm.getLaunchIntentForPackage(name)
+        } else {
+            val query = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            @Suppress("DEPRECATION")
+            val apps = if (android.os.Build.VERSION.SDK_INT >= 33) {
+                pm.queryIntentActivities(query, PackageManager.ResolveInfoFlags.of(0))
+            } else {
+                pm.queryIntentActivities(query, 0)
+            }
+            val match = apps.firstOrNull { it.loadLabel(pm).toString().equals(name, true) }
+                ?: apps.firstOrNull { it.loadLabel(pm).toString().contains(name, true) }
+            match?.let { pm.getLaunchIntentForPackage(it.activityInfo.packageName) }
+        }
         return if (launch != null) {
             try {
                 BackgroundLauncher.start(app, launch, name)
@@ -395,58 +427,8 @@ class PhoneHardwareExecutor(context: Context) {
                 Outcome("Could not launch $name: ${e.message}", false)
             }
         } else {
-            Outcome("$name is not installed on your phone, sir. Please install it from the Play Store.", false, fallThrough = false)
+            Outcome("I couldn't find an app called $name.", false, fallThrough = true)
         }
-    }
-
-    private fun findLaunchIntent(pm: PackageManager, rawName: String): Intent? {
-        val queryName = rawName.lowercase().trim()
-        if (queryName.contains('.')) {
-            pm.getLaunchIntentForPackage(queryName)?.let { return it }
-        }
-
-        val query = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        @Suppress("DEPRECATION")
-        val apps = if (android.os.Build.VERSION.SDK_INT >= 33) {
-            pm.queryIntentActivities(query, PackageManager.ResolveInfoFlags.of(0))
-        } else {
-            pm.queryIntentActivities(query, 0)
-        }
-        if (apps.isEmpty()) return null
-
-        val searchTerms = when {
-            queryName == "notepad" || queryName == "notes" || queryName == "note" -> listOf("notepad", "notes", "note", "keep", "memo")
-            queryName == "freefire" || queryName == "free fire" || queryName == "ff" -> listOf("free fire", "freefire", "garena", "ff")
-            queryName == "gallery" || queryName == "photos" -> listOf("photos", "gallery")
-            queryName == "files" || queryName == "file manager" -> listOf("files", "file manager", "my files")
-            queryName == "camera" -> listOf("camera")
-            queryName == "calculator" -> listOf("calc", "calculator")
-            else -> listOf(queryName)
-        }
-
-        for (term in searchTerms) {
-            val termClean = term.replace(" ", "")
-            val match = apps.firstOrNull {
-                val label = it.loadLabel(pm).toString().lowercase()
-                label == term || label.contains(term) || label.replace(" ", "").contains(termClean)
-            }
-            if (match != null) {
-                return pm.getLaunchIntentForPackage(match.activityInfo.packageName)
-            }
-        }
-
-        for (term in searchTerms) {
-            val termClean = term.replace(" ", "")
-            val match = apps.firstOrNull {
-                val pkg = it.activityInfo.packageName.lowercase()
-                pkg.contains(termClean)
-            }
-            if (match != null) {
-                return pm.getLaunchIntentForPackage(match.activityInfo.packageName)
-            }
-        }
-
-        return null
     }
 
     // ================================================================================================

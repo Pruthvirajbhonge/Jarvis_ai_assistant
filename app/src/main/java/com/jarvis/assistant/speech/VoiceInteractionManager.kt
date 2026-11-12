@@ -47,24 +47,31 @@ class VoiceInteractionManager(context: Context) {
     // Vosk continuous wake engine.
     private var useEngine = true
 
+    val verifier = SpeakerVerificationEngine(appContext)
+    val enrollmentManager = VoiceEnrollmentManager(appContext)
+    @Volatile var isMicMuted: Boolean = false
+    var isModeASupplier: (() -> Boolean)? = null
+
     private val engine = VoskWakeEngine(
         context = appContext,
-        onWake = {
-            main.post { onEngineWake() }
+        onWake = { capturedText ->
+            main.post { onEngineWake(capturedText) }
         },
         onStatus = { msg ->
             main.post { onError?.invoke(msg) }
         },
         onFailure = { msg ->
             main.post { engineFailed(msg) }
-        }
+        },
+        speakerEngine = verifier,
+        isModeA = { isModeASupplier?.invoke() == true }
     )
 
     @Volatile
     var mode: Mode = Mode.IDLE
         private set
 
-    var onWakeWord: (() -> Unit)? = null
+    var onWakeWord: ((text: String?) -> Unit)? = null
     var onTranscript: ((String) -> Unit)? = null
     var onModeChanged: ((Mode) -> Unit)? = null
     var onError: ((String) -> Unit)? = null
@@ -98,6 +105,11 @@ class VoiceInteractionManager(context: Context) {
     fun startWake() = runOnMain {
         wakeEnabled = true
 
+        if (isMicMuted) {
+            onError?.invoke("Microphone is muted.")
+            return@runOnMain
+        }
+
         if (mode == Mode.IDLE && !speaking) {
             enterWake()
         }
@@ -118,6 +130,11 @@ class VoiceInteractionManager(context: Context) {
     }
 
     fun startCommandSession() = runOnMain {
+        if (isMicMuted) {
+            onError?.invoke("Microphone is muted.")
+            return@runOnMain
+        }
+
         engine.stop()
 
         voiceOut.stop()
@@ -228,11 +245,11 @@ class VoiceInteractionManager(context: Context) {
         }
     }
 
-    private fun onEngineWake() {
+    private fun onEngineWake(capturedText: String? = null) {
         if (mode != Mode.WAKE) return
 
         setMode(Mode.IDLE)
-        onWakeWord?.invoke()
+        onWakeWord?.invoke(capturedText)
     }
 
     private fun engineFailed(msg: String) {
@@ -348,6 +365,16 @@ class VoiceInteractionManager(context: Context) {
             )
 
             putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
+                recognitionLocale
+            )
+
+            putExtra(
+                "android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES",
+                arrayOf("en-IN", "en-US")
+            )
+
+            putExtra(
                 RecognizerIntent.EXTRA_PARTIAL_RESULTS,
                 false
             )
@@ -392,7 +419,7 @@ class VoiceInteractionManager(context: Context) {
                 startCommandTimeout(currentId)
             }
 
-        } catch (e: Exception) {
+        } catch (_: Exception) {
 
             if (currentId == sessionId) {
                 handleError(
@@ -475,7 +502,7 @@ class VoiceInteractionManager(context: Context) {
 
                     setMode(Mode.IDLE)
 
-                    onWakeWord?.invoke()
+                    onWakeWord?.invoke(hit)
                 }
             }
 
