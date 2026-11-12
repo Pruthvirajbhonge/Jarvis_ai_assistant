@@ -2,7 +2,6 @@ package com.jarvis.assistant.speech
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import org.json.JSONObject
@@ -55,24 +54,16 @@ class SpeakerEnroller(
             val spkModel = SpeakerModel(spkModelDir.absolutePath)
 
             val sampleRate = 16000f
-            val minBuf = AudioRecord.getMinBufferSize(
-                sampleRate.toInt(), AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
-            )
-
-            var audio: AudioRecord? = null
+            var recorder: EnhancedAudioRecorder? = null
             repeat(4) {
-                val a = AudioRecord(
-                    MediaRecorder.AudioSource.VOICE_RECOGNITION, sampleRate.toInt(),
-                    AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
-                    maxOf(minBuf, 4096) * 4
-                )
-                if (a.state == AudioRecord.STATE_INITIALIZED) { audio = a; return@repeat }
-                a.release()
+                val r = EnhancedAudioRecorder.create(sampleRate.toInt())
+                if (r != null) { recorder = r; return@repeat }
                 if (!isRunning) return
                 Thread.sleep(400)
             }
 
-            if (audio == null) throw IllegalStateException("Microphone is busy.")
+            val enhanced = recorder ?: throw IllegalStateException("Microphone is busy.")
+            val audio = enhanced.audioRecord
 
             val agc = AdaptiveGain()
             val rec = Recognizer(model, sampleRate, spkModel)
@@ -81,7 +72,7 @@ class SpeakerEnroller(
 
             rec.use {
                 try {
-                    audio.startRecording()
+                    enhanced.startRecording()
                     val buf = ShortArray(2048)
 
                     while (isRunning && sampleCount < targetSamples) {
@@ -116,8 +107,7 @@ class SpeakerEnroller(
                         }
                     }
                 } finally {
-                    try { audio.stop() } catch (_: Exception) {}
-                    audio.release()
+                    enhanced.release()
                     try { model.close() } catch (_: Exception) {}
                     try { spkModel.close() } catch (_: Exception) {}
                 }

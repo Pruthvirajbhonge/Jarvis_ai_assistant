@@ -2,7 +2,6 @@ package com.jarvis.assistant.speech
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import org.json.JSONObject
@@ -27,6 +26,12 @@ class AdaptiveGain {
             peak = max(peak, if (v < 0) -v else v)
         }
         val rms = sqrt(sumSq / n)
+        // Noise Gate: Zero out ambient background murmur/silence below noise gate floor
+        if (rms < SILENCE_GATE_RMS) {
+            for (i in 0 until n) buf[i] = 0
+            gain = START_GAIN
+            return
+        }
         if (rms > NOISE_FLOOR_RMS) {
             val wanted = (TARGET_RMS / rms).toFloat().coerceIn(1f, MAX_GAIN)
             gain += (wanted - gain) * (if (wanted < gain) 0.5f else 0.1f)
@@ -43,6 +48,7 @@ class AdaptiveGain {
         const val MAX_GAIN = 8f
         const val TARGET_RMS = 3000.0
         const val NOISE_FLOOR_RMS = 40.0
+        const val SILENCE_GATE_RMS = 25.0
         const val PEAK_LIMIT = 30000f
     }
 }
@@ -111,29 +117,22 @@ class VoskWakeEngine(
             val spk = if (authActive && speakerEngine != null) ensureSpeakerModel() else null
             if (g != generation) return
 
-            val minBuf = AudioRecord.getMinBufferSize(
-                SAMPLE_RATE.toInt(), AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
-            )
-            var audio: AudioRecord? = null
+            var recorder: EnhancedAudioRecorder? = null
             for (attempt in 1..4) { // mic may still be held for a moment by the system recognizer / TTS
-                val a = AudioRecord(
-                    MediaRecorder.AudioSource.VOICE_RECOGNITION, SAMPLE_RATE.toInt(),
-                    AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
-                    maxOf(minBuf, 4096) * 4
-                )
-                if (a.state == AudioRecord.STATE_INITIALIZED) { audio = a; break }
-                a.release()
+                val r = EnhancedAudioRecorder.create(SAMPLE_RATE.toInt())
+                if (r != null) { recorder = r; break }
                 if (g != generation) return
                 Thread.sleep(400)
             }
-            if (audio == null) throw IllegalStateException("Microphone is busy.")
+            val enhanced = recorder ?: throw IllegalStateException("Microphone is busy.")
+            val audio = enhanced.audioRecord
 
             val agc = AdaptiveGain()
             val rec = if (spk != null) Recognizer(m, SAMPLE_RATE, spk) else Recognizer(m, SAMPLE_RATE)
 
             rec.use {
                 try {
-                    audio.startRecording()
+                    enhanced.startRecording()
                     val buf = ShortArray(2048)
                     while (g == generation) {
                         val n = audio.read(buf, 0, buf.size)
@@ -179,8 +178,7 @@ class VoskWakeEngine(
                         break
                     }
                 } finally {
-                    try { audio.stop() } catch (e: Exception) {}
-                    audio.release()
+                    enhanced.release()
                 }
             }
         } catch (e: Exception) {
