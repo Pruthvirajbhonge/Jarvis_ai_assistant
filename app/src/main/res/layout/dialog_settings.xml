@@ -283,6 +283,14 @@
             android:text="Mode A: Direct Voice (No 'Hey Jarvis' required)"
             android:textColor="#80D8FF" />
 
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchBluetoothMic"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Use Bluetooth headset mic (audio quality drops while on)"
+            android:textColor="#FFFFFF" />
+
         <TextView
             android:id="@+id/tvVoiceprintStatus"
             android:layout_width="match_parent"
