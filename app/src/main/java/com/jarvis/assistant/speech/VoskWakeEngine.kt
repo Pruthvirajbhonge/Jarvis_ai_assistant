@@ -45,9 +45,9 @@ class AdaptiveGain {
 
     private companion object {
         const val START_GAIN = 2f
-        const val MAX_GAIN = 8f
+        const val MAX_GAIN = 16f
         const val TARGET_RMS = 3000.0
-        const val NOISE_FLOOR_RMS = 40.0
+        const val NOISE_FLOOR_RMS = 20.0
         const val SILENCE_GATE_RMS = 25.0
         const val PEAK_LIMIT = 30000f
     }
@@ -104,6 +104,7 @@ class VoskWakeEngine(
     private fun runLoop(g: Int, prev: Thread?) {
         var retryable = true
         val authActive = isVoiceAuthEnabled?.invoke() == true
+        var btRouter: BluetoothMicRouter? = null
         try {
             // Fail closed only when voice auth is enabled: never accept everyone when auth is ON but not enrolled.
             if (authActive && speakerEngine != null && !speakerEngine.isEnrolled) {
@@ -117,9 +118,16 @@ class VoskWakeEngine(
             val spk = if (authActive && speakerEngine != null) ensureSpeakerModel() else null
             if (g != generation) return
 
+            var btOk = false
+            if (MicPrefs.useBluetoothMic(context)) {
+                btRouter = BluetoothMicRouter(context)
+                btOk = btRouter!!.start()
+                if (!btOk) onStatus("Bluetooth mic not available, using the phone mic.")
+            }
+
             var recorder: EnhancedAudioRecorder? = null
             for (attempt in 1..4) { // mic may still be held for a moment by the system recognizer / TTS
-                val r = EnhancedAudioRecorder.create(SAMPLE_RATE.toInt())
+                val r = EnhancedAudioRecorder.create(context = context, preferBluetooth = btOk, sampleRate = SAMPLE_RATE.toInt())
                 if (r != null) { recorder = r; break }
                 if (g != generation) return
                 Thread.sleep(400)
@@ -141,11 +149,10 @@ class VoskWakeEngine(
 
                         agc.process(buf, n)
 
-                        // Only act on a FINISHED utterance (full phrase -> reliable x-vector).
-                        if (!rec.acceptWaveForm(buf, n)) continue
-
-                        val o = JSONObject(rec.result)
-                        val text = o.optString("text")
+                        val isFinal = rec.acceptWaveForm(buf, n)
+                        val jsonStr = if (isFinal) rec.result else rec.partialResult
+                        val o = JSONObject(jsonStr)
+                        val text = if (isFinal) o.optString("text") else o.optString("partial")
                         if (text.isEmpty()) continue
 
                         val modeA = isModeA?.invoke() == true
@@ -154,6 +161,7 @@ class VoskWakeEngine(
                         if (!accepted) continue
 
                         if (authActive && speakerEngine != null) {
+                            if (!isFinal) continue
                             val arr = o.optJSONArray("spk")
                             val frames = o.optInt("spk_frames", 0)
                             if (arr == null || frames < MIN_SPK_FRAMES) {
@@ -189,6 +197,8 @@ class VoskWakeEngine(
                 }
             }
             onFailure(e.message ?: "Wake engine failed.", retryable)
+        } finally {
+            btRouter?.stop()
         }
     }
 

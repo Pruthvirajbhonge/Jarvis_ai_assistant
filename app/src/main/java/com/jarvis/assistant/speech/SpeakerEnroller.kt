@@ -40,6 +40,7 @@ class SpeakerEnroller(
         engine.beginEnrollment()
 
         var sampleCount = 0
+        var btRouter: BluetoothMicRouter? = null
         try {
             onStatus("Loading models for voice enrollment…")
 
@@ -54,10 +55,17 @@ class SpeakerEnroller(
             val spkModel = SpeakerModel(spkModelDir.absolutePath)
 
             val sampleRate = 16000f
+            var btOk = false
+            if (MicPrefs.useBluetoothMic(context)) {
+                btRouter = BluetoothMicRouter(context)
+                btOk = btRouter!!.start()
+                if (!btOk) onStatus("Bluetooth mic not available, using the phone mic.")
+            }
+
             var recorder: EnhancedAudioRecorder? = null
-            repeat(4) {
-                val r = EnhancedAudioRecorder.create(sampleRate.toInt())
-                if (r != null) { recorder = r; return@repeat }
+            for (attempt in 1..4) { // `repeat` + return@repeat does NOT break: it opened 4 mics and leaked 3
+                val r = EnhancedAudioRecorder.create(context = context, preferBluetooth = btOk, sampleRate = sampleRate.toInt())
+                if (r != null) { recorder = r; break }
                 if (!isRunning) return
                 Thread.sleep(400)
             }
@@ -126,6 +134,7 @@ class SpeakerEnroller(
         } catch (e: Exception) {
             onDone(false, e.message ?: "Voiceprint enrollment failed.")
         } finally {
+            btRouter?.stop()
             isRunning = false
         }
     }
