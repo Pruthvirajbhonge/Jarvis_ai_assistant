@@ -176,6 +176,7 @@ class VoiceInteractionManager(context: Context) {
         }
 
         engine.stop()
+        stopBluetoothMic()
         main.removeCallbacksAndMessages(null)
         if (mode == Mode.WAKE || mode == Mode.COMMAND) {
             cancelRecognizer()
@@ -195,8 +196,9 @@ class VoiceInteractionManager(context: Context) {
     fun speak(text: String) = runOnMain {
         if (text.isBlank()) return@runOnMain
 
+        engine.stop()
+        stopBluetoothMic()
         if (mode == Mode.WAKE) {
-            engine.stop()
             main.removeCallbacksAndMessages(null)
             cancelRecognizer()
             setMode(Mode.IDLE)

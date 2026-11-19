@@ -44,11 +44,11 @@ class AdaptiveGain {
     }
 
     private companion object {
-        const val START_GAIN = 2f
-        const val MAX_GAIN = 16f
-        const val TARGET_RMS = 3000.0
-        const val NOISE_FLOOR_RMS = 20.0
-        const val SILENCE_GATE_RMS = 25.0
+        const val START_GAIN = 3.5f
+        const val MAX_GAIN = 24f
+        const val TARGET_RMS = 3500.0
+        const val NOISE_FLOOR_RMS = 5.0
+        const val SILENCE_GATE_RMS = 6.0
         const val PEAK_LIMIT = 30000f
     }
 }
@@ -104,7 +104,6 @@ class VoskWakeEngine(
     private fun runLoop(g: Int, prev: Thread?) {
         var retryable = true
         val authActive = isVoiceAuthEnabled?.invoke() == true
-        var btRouter: BluetoothMicRouter? = null
         try {
             // Fail closed only when voice auth is enabled: never accept everyone when auth is ON but not enrolled.
             if (authActive && speakerEngine != null && !speakerEngine.isEnrolled) {
@@ -118,16 +117,9 @@ class VoskWakeEngine(
             val spk = if (authActive && speakerEngine != null) ensureSpeakerModel() else null
             if (g != generation) return
 
-            var btOk = false
-            if (MicPrefs.useBluetoothMic(context)) {
-                btRouter = BluetoothMicRouter(context)
-                btOk = btRouter!!.start()
-                if (!btOk) onStatus("Bluetooth mic not available, using the phone mic.")
-            }
-
             var recorder: EnhancedAudioRecorder? = null
             for (attempt in 1..4) { // mic may still be held for a moment by the system recognizer / TTS
-                val r = EnhancedAudioRecorder.create(context = context, preferBluetooth = btOk, sampleRate = SAMPLE_RATE.toInt())
+                val r = EnhancedAudioRecorder.create(context = context, preferBluetooth = false, sampleRate = SAMPLE_RATE.toInt())
                 if (r != null) { recorder = r; break }
                 if (g != generation) return
                 Thread.sleep(400)
@@ -197,8 +189,6 @@ class VoskWakeEngine(
                 }
             }
             onFailure(e.message ?: "Wake engine failed.", retryable)
-        } finally {
-            btRouter?.stop()
         }
     }
 
@@ -226,7 +216,10 @@ class VoskWakeEngine(
         const val SAMPLE_RATE = 16000f
         const val MIN_SPK_FRAMES = 50 // ~0.5 s of speech; raise to 100 for stricter verification
         val modelLock = Any()
-        val WAKE = Regex("\\b(jarvis|jar vis|jarvish|jarves|jarvas|javis)\\b", RegexOption.IGNORE_CASE)
+        val WAKE = Regex(
+            "\\b(jarvis|jar vis|jarvish|jarves|jarvas|javis|jervis|charvis|garvis|davis|harvis|travis|ervis|जार्विस|जर्विस|जार्वीस)\\b",
+            RegexOption.IGNORE_CASE
+        )
         // Mode A: ONLY known command words (the old `text.length >= 8` rule accepted any chatter).
         val COMMAND_KEYWORDS = Regex(
             """\b(open|close|turn|set|call|dial|play|stop|search|show|find|volume|torch|flashlight|whatsapp|youtube|spotify|chrome|freefire|notes|camera|calculator|gallery|settings|mute|unmute|up|down|back|home|recents)\b|उघड|उघडा|चालू|चालु|बंद|कॉल|फोन|सर्च|शोधा|आवाज""",

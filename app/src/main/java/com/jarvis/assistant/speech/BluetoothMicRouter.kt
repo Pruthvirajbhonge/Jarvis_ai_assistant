@@ -74,11 +74,13 @@ class BluetoothMicRouter(context: Context) {
         if (!started) return
         started = false
         try {
-            if (Build.VERSION.SDK_INT >= 31) am.clearCommunicationDevice()
-            else stopSco(am)
+            if (Build.VERSION.SDK_INT >= 31) {
+                am.clearCommunicationDevice()
+            }
+            stopSco(am)
         } catch (_: Exception) {}
         try {
-            am.mode = prevMode
+            am.mode = AudioManager.MODE_NORMAL
         } catch (_: Exception) {}
     }
 
