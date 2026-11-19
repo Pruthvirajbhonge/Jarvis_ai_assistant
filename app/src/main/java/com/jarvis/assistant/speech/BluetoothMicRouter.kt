@@ -44,17 +44,28 @@ class BluetoothMicRouter(context: Context) {
 
         if (Build.VERSION.SDK_INT >= 31) {
             val dev = am.availableCommunicationDevices.firstOrNull { isBluetooth(it) }
-            if (dev == null || !am.setCommunicationDevice(dev)) { stop(); return false }
-        } else {
-            @Suppress("DEPRECATION") am.startBluetoothSco()
-            @Suppress("DEPRECATION") am.isBluetoothScoOn = true
+            if (dev != null && am.setCommunicationDevice(dev)) {
+                return true
+            }
         }
 
-        val end = SystemClock.elapsedRealtime() + 3000
+        try {
+            startSco(am)
+        } catch (_: Exception) {}
+
+        val end = SystemClock.elapsedRealtime() + 2000
         while (SystemClock.elapsedRealtime() < end) {
             if (findInput(ctx) != null) return true
-            try { Thread.sleep(150) } catch (_: InterruptedException) { break }
+            try { Thread.sleep(100) } catch (_: InterruptedException) { break }
         }
+
+        if (Build.VERSION.SDK_INT >= 31 && am.communicationDevice != null) {
+            return true
+        }
+        if (isScoOn(am)) {
+            return true
+        }
+
         stop()
         return false
     }
@@ -64,18 +75,33 @@ class BluetoothMicRouter(context: Context) {
         started = false
         try {
             if (Build.VERSION.SDK_INT >= 31) am.clearCommunicationDevice()
-            else {
-                @Suppress("DEPRECATION") am.stopBluetoothSco()
-                @Suppress("DEPRECATION") am.isBluetoothScoOn = false
-            }
+            else stopSco(am)
         } catch (_: Exception) {}
-        am.mode = prevMode
+        try {
+            am.mode = prevMode
+        } catch (_: Exception) {}
     }
+
+    @Suppress("DEPRECATION")
+    private fun startSco(audioManager: AudioManager) {
+        audioManager.startBluetoothSco()
+        audioManager.isBluetoothScoOn = true
+    }
+
+    @Suppress("DEPRECATION")
+    private fun stopSco(audioManager: AudioManager) {
+        audioManager.stopBluetoothSco()
+        audioManager.isBluetoothScoOn = false
+    }
+
+    @Suppress("DEPRECATION")
+    private fun isScoOn(audioManager: AudioManager): Boolean = audioManager.isBluetoothScoOn
 
     companion object {
         fun isBluetooth(d: AudioDeviceInfo): Boolean =
             d.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
-                (Build.VERSION.SDK_INT >= 31 && d.type == AudioDeviceInfo.TYPE_BLE_HEADSET)
+                d.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                (Build.VERSION.SDK_INT >= 31 && (d.type == AudioDeviceInfo.TYPE_BLE_HEADSET || d.type == AudioDeviceInfo.TYPE_BLE_SPEAKER))
 
         fun findInput(context: Context): AudioDeviceInfo? =
             (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager)

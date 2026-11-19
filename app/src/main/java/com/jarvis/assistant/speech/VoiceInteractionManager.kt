@@ -54,6 +54,24 @@ class VoiceInteractionManager(context: Context) {
     var isModeASupplier: (() -> Boolean)? = null
     var isVoiceAuthEnabledSupplier: (() -> Boolean)? = null
 
+    private var btRouter: BluetoothMicRouter? = null
+
+    private fun ensureBluetoothMic() {
+        if (MicPrefs.useBluetoothMic(appContext)) {
+            if (btRouter == null) {
+                btRouter = BluetoothMicRouter(appContext)
+            }
+            btRouter?.start()
+        } else {
+            stopBluetoothMic()
+        }
+    }
+
+    private fun stopBluetoothMic() {
+        btRouter?.stop()
+        btRouter = null
+    }
+
     private val engine = VoskWakeEngine(
         context = appContext,
         onWake = { capturedText ->
@@ -348,6 +366,10 @@ class VoiceInteractionManager(context: Context) {
         cancelCommandTimeout()
         cancelRecognizer()
 
+        if (MicPrefs.useBluetoothMic(appContext)) {
+            Thread { ensureBluetoothMic() }.start()
+        }
+
         if (!SpeechRecognizer.isRecognitionAvailable(appContext)) {
             setMode(Mode.IDLE)
 
@@ -458,6 +480,7 @@ class VoiceInteractionManager(context: Context) {
         cancelCommandTimeout()
 
         cancelRecognizer()
+        stopBluetoothMic()
 
         setMode(Mode.IDLE)
 
