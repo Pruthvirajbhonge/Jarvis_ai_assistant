@@ -565,35 +565,74 @@ class JarvisReactorView : View {
         }
     }
 
-    /** Live mic waveform under the reactor (HUD: #audioWaveform + the MIC ACTIVE label). */
+    /** Live mic audio-reactive vertical neon bars under the reactor (HUD style). */
     private fun drawBottomWaveform(c: Canvas) {
         val bottomY = cy + radiusPx * 1.18f
-        val waveW = min(width * 0.78f, radiusPx * 2f)
+        val waveW = min(width * 0.82f, radiusPx * 2.1f)
         val startX = cx - waveW / 2f
-        val live = state == State.LISTENING || state == State.SPEAKING
-        val amp = if (live) dp(3f) + voiceLevel * dp(15f) else dp(1.4f)
-        val steps = 64
-
-        tmpPath.reset()
-        for (i in 0..steps) {
-            val t = i.toFloat() / steps
-            val x = startX + t * waveW
-            val env = sin(PI.toFloat() * t)
-            val y = bottomY + env * amp * sin(t * 24f + linePhase * 14f) +
-                    (if (live) env * voiceLevel * amp * .5f * sin(t * 9f - linePhase * 9f) else 0f)
-            if (i == 0) tmpPath.moveTo(x, y) else tmpPath.lineTo(x, y)
-        }
+        val activeMic = voiceLevel > 0.01f
+        val live = state == State.LISTENING || state == State.SPEAKING || activeMic
         val wc = if (state == State.ERROR) C_RED else C_CYAN2
-        sp.shader = null; sp.style = Paint.Style.STROKE; sp.strokeCap = Paint.Cap.ROUND; sp.strokeJoin = Paint.Join.ROUND
-        sp.color = ca(wc, if (live) .18f else .08f); sp.strokeWidth = dp(5f); c.drawPath(tmpPath, sp)
-        sp.color = ca(wc, if (live) .62f + voiceLevel * .38f else .28f); sp.strokeWidth = dp(1.5f) + voiceLevel * dp(1.2f)
-        c.drawPath(tmpPath, sp)
 
-        tp.typeface = uiFont; tp.textSize = dp(8f); tp.letterSpacing = .16f; tp.style = Paint.Style.FILL
-        tp.color = when (state) { State.ERROR -> C_AMBER; State.PROCESSING -> C_CYAN2; else -> C_GREEN }
+        val barCount = 37
+        val halfCount = barCount / 2
+        val spacing = waveW / (barCount + 1)
+
+        // 1. Draw horizontal glowing center line
+        sp.shader = null; sp.style = Paint.Style.STROKE; sp.strokeCap = Paint.Cap.ROUND
+        sp.color = ca(wc, if (live) .35f + voiceLevel * .45f else .18f)
+        sp.strokeWidth = dp(1.2f)
+        c.drawLine(startX, bottomY, startX + waveW, bottomY, sp)
+
+        // 2. Draw vertical symmetrical neon cyan bars (matching reference image)
+        for (i in -halfCount..halfCount) {
+            val x = cx + i * spacing
+            val normDist = kotlin.math.abs(i.toFloat()) / halfCount
+            val env = cos(normDist * (PI.toFloat() / 2f))
+
+            val wave1 = sin(linePhase * 12f + i * 0.38f)
+            val wave2 = cos(linePhase * 20f - i * 0.22f)
+            val modulation = kotlin.math.abs(wave1 * 0.6f + wave2 * 0.4f)
+
+            val hBar = if (live && voiceLevel > 0.005f) {
+                dp(2.5f) + voiceLevel * dp(32f) * env * (0.25f + 0.75f * modulation)
+            } else {
+                dp(2.2f) * env
+            }
+
+            val barW = dp(2.2f)
+            val halfH = hBar / 2f
+
+            // Outer cyan glow for active bars
+            if (voiceLevel > 0.03f && env > 0.2f) {
+                val alphaVal = (voiceLevel * 0.45f * env).coerceIn(0f, 0.55f)
+                sp.color = ca(wc, alphaVal)
+                sp.strokeWidth = barW + dp(3.5f)
+                c.drawLine(x, bottomY - halfH, x, bottomY + halfH, sp)
+            }
+
+            // Core rounded vertical bar
+            fp.color = ca(if (live && voiceLevel > 0.02f) Color.WHITE else wc, if (live) .85f + voiceLevel * .15f else .35f)
+            rect.set(x - barW / 2f, bottomY - halfH, x + barW / 2f, bottomY + halfH)
+            c.drawRoundRect(rect, barW / 2f, barW / 2f, fp)
+        }
+
+        // Status text label
+        tp.typeface = uiFont; tp.textSize = dp(8.5f); tp.letterSpacing = .18f; tp.style = Paint.Style.FILL
+        tp.color = when (state) {
+            State.ERROR -> C_RED
+            State.PROCESSING -> C_AMBER
+            State.LISTENING -> C_CYAN2
+            else -> if (activeMic) C_CYAN2 else C_GREEN
+        }
         c.drawText(
-            when (state) { State.ERROR -> "MIC ERROR"; State.PROCESSING -> "PROCESSING"; else -> "MIC ACTIVE" },
-            cx, bottomY + dp(24f), tp
+            when (state) {
+                State.ERROR -> "MIC ERROR"
+                State.PROCESSING -> "PROCESSING..."
+                State.LISTENING -> "LISTENING..."
+                else -> if (activeMic) "AUDIO DETECTED" else "MIC ACTIVE"
+            },
+            cx, bottomY + dp(22f), tp
         )
     }
 
