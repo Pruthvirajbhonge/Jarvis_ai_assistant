@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:background="#050B14">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -9,365 +11,462 @@
         android:orientation="vertical"
         android:padding="20dp">
 
+        <!-- DIALOG HEADER -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingBottom="12dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="Settings Icon"
+                android:src="@drawable/ic_settings"
+                app:tint="#00E5FF" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:letterSpacing="0.2"
+                android:text="J.A.R.V.I.S. HUD SETTINGS"
+                android:textColor="#00E5FF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- SECTION 1: VOICE & MICROPHONE SETTINGS -->
         <TextView
             style="@style/TextAppearance.Material3.LabelMedium"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="0dp"
-            android:text="AI services — if one fails, the next one is used automatically"
-            android:textColor="#80D8FF" />
-
-        <TextView
-            style="@style/TextAppearance.Material3.LabelMedium"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Gemini API key"
-            android:textColor="#80D8FF" />
-
-        <EditText
-            android:id="@+id/etGeminiKey"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="4dp"
-            android:autofillHints="no"
-            android:background="@drawable/bg_edit_text"
-            android:hint="AIza..."
-            android:inputType="textPassword"
-            android:paddingHorizontal="16dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#546E7A"
-            android:textSize="14sp" />
-
-        <TextView
-            style="@style/TextAppearance.Material3.LabelMedium"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Gemini model"
-            android:textColor="#80D8FF" />
-
-        <EditText
-            android:id="@+id/etGeminiModel"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="4dp"
-            android:autofillHints="no"
-            android:background="@drawable/bg_edit_text"
-            android:hint="gemini-2.5-flash"
-            android:inputType="textUri"
-            android:paddingHorizontal="16dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#546E7A"
-            android:textSize="14sp" />
-
-        <TextView
-            style="@style/TextAppearance.Material3.LabelMedium"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Groq API key"
-            android:textColor="#80D8FF" />
-
-        <EditText
-            android:id="@+id/etGroqKey"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="4dp"
-            android:autofillHints="no"
-            android:background="@drawable/bg_edit_text"
-            android:hint="gsk_..."
-            android:inputType="textPassword"
-            android:paddingHorizontal="16dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#546E7A"
-            android:textSize="14sp" />
-
-        <TextView
-            style="@style/TextAppearance.Material3.LabelMedium"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Groq model"
-            android:textColor="#80D8FF" />
-
-        <EditText
-            android:id="@+id/etGroqModel"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="4dp"
-            android:autofillHints="no"
-            android:background="@drawable/bg_edit_text"
-            android:hint="llama-3.3-70b-versatile"
-            android:inputType="textUri"
-            android:paddingHorizontal="16dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#546E7A"
-            android:textSize="14sp" />
-
-        <TextView
-            style="@style/TextAppearance.Material3.LabelMedium"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Grok (xAI) API key"
-            android:textColor="#80D8FF" />
-
-        <EditText
-            android:id="@+id/etXaiKey"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="4dp"
-            android:autofillHints="no"
-            android:background="@drawable/bg_edit_text"
-            android:hint="xai-..."
-            android:inputType="textPassword"
-            android:paddingHorizontal="16dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#546E7A"
-            android:textSize="14sp" />
-
-        <TextView
-            style="@style/TextAppearance.Material3.LabelMedium"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Grok model"
-            android:textColor="#80D8FF" />
-
-        <EditText
-            android:id="@+id/etXaiModel"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="4dp"
-            android:autofillHints="no"
-            android:background="@drawable/bg_edit_text"
-            android:hint="grok-3-mini"
-            android:inputType="textUri"
-            android:paddingHorizontal="16dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#546E7A"
-            android:textSize="14sp" />
-
-        <TextView
-            style="@style/TextAppearance.Material3.LabelMedium"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="OpenRouter API key"
-            android:textColor="#80D8FF" />
-
-        <EditText
-            android:id="@+id/etOpenRouterKey"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="4dp"
-            android:autofillHints="no"
-            android:background="@drawable/bg_edit_text"
-            android:hint="sk-or-..."
-            android:inputType="textPassword"
-            android:paddingHorizontal="16dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#546E7A"
-            android:textSize="14sp" />
-
-        <TextView
-            style="@style/TextAppearance.Material3.LabelMedium"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="OpenRouter model"
-            android:textColor="#80D8FF" />
-
-        <EditText
-            android:id="@+id/etOpenRouterModel"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="4dp"
-            android:autofillHints="no"
-            android:background="@drawable/bg_edit_text"
-            android:hint="openrouter/auto"
-            android:inputType="textUri"
-            android:paddingHorizontal="16dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#546E7A"
-            android:textSize="14sp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnTestAi"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Test AI connection" />
-
-        <TextView
-            style="@style/TextAppearance.Material3.LabelMedium"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="Phone access"
-            android:textColor="#80D8FF" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnAccessibility"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Enable automation (Accessibility)" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnOverlay"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Allow display over other apps" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnNotifAccess"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Allow notification access" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnWriteSettings"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Allow brightness control" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnBattery"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Disable battery optimization" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/switchWake"
-            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Always listen for “Hey Jarvis”"
-            android:textColor="#FFFFFF" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/switchOrb"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Floating reactor orb"
-            android:textColor="#FFFFFF" />
-
-        <TextView
-            style="@style/TextAppearance.Material3.LabelMedium"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Personal Voice Authentication"
-            android:textColor="#80D8FF" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/switchVoiceAuth"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Voice Authentication (Speaker Verification)"
-            android:textColor="#FFFFFF" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/switchVoiceModeA"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Mode A: Direct Voice (No 'Hey Jarvis' required)"
-            android:textColor="#80D8FF" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/switchBluetoothMic"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Use Bluetooth headset mic (audio quality drops while on)"
-            android:textColor="#FFFFFF" />
-
-        <TextView
-            android:id="@+id/tvVoiceprintStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Status: No voiceprint enrolled yet."
-            android:textColor="#B0BEC5"
-            android:textSize="12sp" />
+            android:letterSpacing="0.15"
+            android:text="1. VOICE &amp; MICROPHONE SETTINGS"
+            android:textColor="#37DCFF"
+            android:textStyle="bold" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:orientation="horizontal">
+            android:background="@drawable/bg_glass_card"
+            android:orientation="vertical"
+            android:padding="12dp">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnEnrollVoiceprint"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchWake"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:text="Enroll Voiceprint" />
+                android:text="Always listen for “Hey Jarvis”"
+                android:textColor="#FFFFFF" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnDeleteVoiceprint"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchBluetoothMic"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:text="Delete Voiceprint" />
+                android:layout_marginTop="4dp"
+                android:text="Use Bluetooth headset mic (Auto-Switching)"
+                android:textColor="#FFFFFF" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchOrb"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Floating Arc Reactor Orb"
+                android:textColor="#FFFFFF" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchVoiceAuth"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Voice Authentication (Owner Voice Verification)"
+                android:textColor="#FFFFFF" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchVoiceModeA"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Mode A: Direct Voice (No 'Hey Jarvis' required)"
+                android:textColor="#80D8FF" />
+
+            <TextView
+                android:id="@+id/tvVoiceprintStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Status: No voiceprint enrolled yet."
+                android:textColor="#B0BEC5"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnEnrollVoiceprint"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:text="Enroll Voiceprint"
+                    android:textColor="#00E5FF"
+                    app:strokeColor="#00E5FF" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDeleteVoiceprint"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:text="Delete Voiceprint"
+                    android:textColor="#FF5252"
+                    app:strokeColor="#FF5252" />
+            </LinearLayout>
         </LinearLayout>
 
+        <!-- SECTION 2: SYSTEM AUTOMATION & PERMISSIONS -->
         <TextView
             style="@style/TextAppearance.Material3.LabelMedium"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="PC mode (optional) — PC address (IP:port)"
-            android:textColor="#80D8FF" />
+            android:layout_marginTop="16dp"
+            android:letterSpacing="0.15"
+            android:text="2. SYSTEM AUTOMATION &amp; PERMISSIONS"
+            android:textColor="#37DCFF"
+            android:textStyle="bold" />
 
-        <EditText
-            android:id="@+id/etPcHost"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="4dp"
-            android:autofillHints="no"
-            android:background="@drawable/bg_edit_text"
-            android:hint="192.168.43.59:8000"
-            android:inputType="textUri"
-            android:paddingHorizontal="16dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#546E7A"
-            android:textSize="14sp" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_glass_card"
+            android:orientation="vertical"
+            android:padding="12dp">
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAccessibility"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Enable Automation (Accessibility)"
+                android:textColor="#80D8FF"
+                app:strokeColor="#26637D" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnOverlay"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Allow Display Over Other Apps"
+                android:textColor="#80D8FF"
+                app:strokeColor="#26637D" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnNotifAccess"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Allow Notification Access"
+                android:textColor="#80D8FF"
+                app:strokeColor="#26637D" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWriteSettings"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Allow System Brightness Control"
+                android:textColor="#80D8FF"
+                app:strokeColor="#26637D" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBattery"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Disable Battery Optimization (24/7 Run)"
+                android:textColor="#80D8FF"
+                app:strokeColor="#26637D" />
+        </LinearLayout>
+
+        <!-- SECTION 3: AI MODELS & API CONFIGURATION -->
         <TextView
             style="@style/TextAppearance.Material3.LabelMedium"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="PC token (optional)"
-            android:textColor="#80D8FF" />
+            android:layout_marginTop="16dp"
+            android:letterSpacing="0.15"
+            android:text="3. AI MODELS &amp; API CONFIGURATION"
+            android:textColor="#37DCFF"
+            android:textStyle="bold" />
 
-        <EditText
-            android:id="@+id/etToken"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="4dp"
-            android:autofillHints="no"
-            android:background="@drawable/bg_edit_text"
-            android:hint=""
-            android:inputType="textPassword"
-            android:paddingHorizontal="16dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#546E7A"
-            android:textSize="14sp" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_glass_card"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                style="@style/TextAppearance.Material3.LabelMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Gemini API Key"
+                android:textColor="#80D8FF" />
+
+            <EditText
+                android:id="@+id/etGeminiKey"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:autofillHints="no"
+                android:background="@drawable/bg_edit_text"
+                android:hint="AIza..."
+                android:inputType="textPassword"
+                android:paddingHorizontal="14dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#546E7A"
+                android:textSize="13sp" />
+
+            <TextView
+                style="@style/TextAppearance.Material3.LabelMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Gemini Model"
+                android:textColor="#80D8FF" />
+
+            <EditText
+                android:id="@+id/etGeminiModel"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:autofillHints="no"
+                android:background="@drawable/bg_edit_text"
+                android:hint="gemini-2.5-flash"
+                android:inputType="textUri"
+                android:paddingHorizontal="14dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#546E7A"
+                android:textSize="13sp" />
+
+            <TextView
+                style="@style/TextAppearance.Material3.LabelMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Groq API Key"
+                android:textColor="#80D8FF" />
+
+            <EditText
+                android:id="@+id/etGroqKey"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:autofillHints="no"
+                android:background="@drawable/bg_edit_text"
+                android:hint="gsk_..."
+                android:inputType="textPassword"
+                android:paddingHorizontal="14dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#546E7A"
+                android:textSize="13sp" />
+
+            <TextView
+                style="@style/TextAppearance.Material3.LabelMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Groq Model"
+                android:textColor="#80D8FF" />
+
+            <EditText
+                android:id="@+id/etGroqModel"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:autofillHints="no"
+                android:background="@drawable/bg_edit_text"
+                android:hint="llama-3.3-70b-versatile"
+                android:inputType="textUri"
+                android:paddingHorizontal="14dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#546E7A"
+                android:textSize="13sp" />
+
+            <TextView
+                style="@style/TextAppearance.Material3.LabelMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Grok (xAI) API Key"
+                android:textColor="#80D8FF" />
+
+            <EditText
+                android:id="@+id/etXaiKey"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:autofillHints="no"
+                android:background="@drawable/bg_edit_text"
+                android:hint="xai-..."
+                android:inputType="textPassword"
+                android:paddingHorizontal="14dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#546E7A"
+                android:textSize="13sp" />
+
+            <TextView
+                style="@style/TextAppearance.Material3.LabelMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Grok Model"
+                android:textColor="#80D8FF" />
+
+            <EditText
+                android:id="@+id/etXaiModel"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:autofillHints="no"
+                android:background="@drawable/bg_edit_text"
+                android:hint="grok-3-mini"
+                android:inputType="textUri"
+                android:paddingHorizontal="14dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#546E7A"
+                android:textSize="13sp" />
+
+            <TextView
+                style="@style/TextAppearance.Material3.LabelMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="OpenRouter API Key"
+                android:textColor="#80D8FF" />
+
+            <EditText
+                android:id="@+id/etOpenRouterKey"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:autofillHints="no"
+                android:background="@drawable/bg_edit_text"
+                android:hint="sk-or-..."
+                android:inputType="textPassword"
+                android:paddingHorizontal="14dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#546E7A"
+                android:textSize="13sp" />
+
+            <TextView
+                style="@style/TextAppearance.Material3.LabelMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="OpenRouter Model"
+                android:textColor="#80D8FF" />
+
+            <EditText
+                android:id="@+id/etOpenRouterModel"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:autofillHints="no"
+                android:background="@drawable/bg_edit_text"
+                android:hint="openrouter/auto"
+                android:inputType="textUri"
+                android:paddingHorizontal="14dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#546E7A"
+                android:textSize="13sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTestAi"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="⚡ Test AI Connection"
+                android:textColor="#00E5FF"
+                app:strokeColor="#00E5FF" />
+        </LinearLayout>
+
+        <!-- SECTION 4: ADVANCED SETTINGS (PC REMOTE LINK) -->
+        <TextView
+            style="@style/TextAppearance.Material3.LabelMedium"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:letterSpacing="0.15"
+            android:text="4. ADVANCED SETTINGS (PC REMOTE LINK)"
+            android:textColor="#37DCFF"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_glass_card"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                style="@style/TextAppearance.Material3.LabelMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PC Address (IP:port)"
+                android:textColor="#80D8FF" />
+
+            <EditText
+                android:id="@+id/etPcHost"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:autofillHints="no"
+                android:background="@drawable/bg_edit_text"
+                android:hint="192.168.43.59:8000"
+                android:inputType="textUri"
+                android:paddingHorizontal="14dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#546E7A"
+                android:textSize="13sp" />
+
+            <TextView
+                style="@style/TextAppearance.Material3.LabelMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="PC Security Token (Optional)"
+                android:textColor="#80D8FF" />
+
+            <EditText
+                android:id="@+id/etToken"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:autofillHints="no"
+                android:background="@drawable/bg_edit_text"
+                android:hint=""
+                android:inputType="textPassword"
+                android:paddingHorizontal="14dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#546E7A"
+                android:textSize="13sp" />
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>
