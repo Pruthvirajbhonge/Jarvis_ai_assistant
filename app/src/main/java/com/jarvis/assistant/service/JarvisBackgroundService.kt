@@ -47,6 +47,9 @@ class JarvisBackgroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_SPEAK) {
+            core.voice.startCommandSession()
+        }
         // Called again every time the app opens or settings are saved: re-evaluate the orb.
         scope.launch {
             val enabled = core.settings.current().floatingOrb
@@ -71,11 +74,19 @@ class JarvisBackgroundService : Service() {
         val pending = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
+        val speakIntent = Intent(this, JarvisBackgroundService::class.java).apply {
+            action = ACTION_SPEAK
+        }
+        val speakPending = PendingIntent.getService(
+            this, 1, speakIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("J.A.R.V.I.S. is active")
             .setContentText("Listening for “Hey Jarvis” in the background…")
             .setSmallIcon(R.drawable.ic_reactor_icon)
             .setContentIntent(pending)
+            .addAction(R.drawable.ic_mic, "Tap to Speak", speakPending)
             .setOngoing(true)
             .build()
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
@@ -95,5 +106,6 @@ class JarvisBackgroundService : Service() {
         const val TAG = "JarvisService"
         const val CHANNEL_ID = "jarvis_service_channel"
         const val NOTIFICATION_ID = 101
+        const val ACTION_SPEAK = "com.jarvis.assistant.ACTION_SPEAK"
     }
 }

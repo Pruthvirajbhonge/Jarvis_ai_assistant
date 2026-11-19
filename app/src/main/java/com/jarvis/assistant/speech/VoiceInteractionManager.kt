@@ -57,7 +57,7 @@ class VoiceInteractionManager(context: Context) {
     private var btRouter: BluetoothMicRouter? = null
 
     private fun ensureBluetoothMic() {
-        if (MicPrefs.useBluetoothMic(appContext)) {
+        if (MicPrefs.useBluetoothMic(appContext) || BluetoothMicRouter.findInput(appContext) != null) {
             if (btRouter == null) {
                 btRouter = BluetoothMicRouter(appContext)
             }

@@ -103,8 +103,14 @@ class BluetoothMicRouter(context: Context) {
                 d.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
                 (Build.VERSION.SDK_INT >= 31 && (d.type == AudioDeviceInfo.TYPE_BLE_HEADSET || d.type == AudioDeviceInfo.TYPE_BLE_SPEAKER))
 
-        fun findInput(context: Context): AudioDeviceInfo? =
-            (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager)
-                .getDevices(AudioManager.GET_DEVICES_INPUTS).firstOrNull { isBluetooth(it) }
+        fun findInput(context: Context): AudioDeviceInfo? {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val inputDev = am.getDevices(AudioManager.GET_DEVICES_INPUTS).firstOrNull { isBluetooth(it) }
+            if (inputDev != null) return inputDev
+            if (Build.VERSION.SDK_INT >= 31) {
+                return am.availableCommunicationDevices.firstOrNull { isBluetooth(it) }
+            }
+            return null
+        }
     }
 }
