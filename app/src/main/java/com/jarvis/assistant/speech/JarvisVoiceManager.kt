@@ -57,6 +57,7 @@ class JarvisVoiceManager(context: Context) {
 
     /** Turn the Edge neural voice off to always use the offline voice. */
     @Volatile var neuralEnabled: Boolean = true
+    @Volatile private var neuralSkipUntil = 0L
 
     private val appContext = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
@@ -102,10 +103,17 @@ class JarvisVoiceManager(context: Context) {
 
         job = scope.launch {
             var played = false
-            if (neuralEnabled && isOnline()) {
+            if (neuralEnabled && isOnline() && System.currentTimeMillis() >= neuralSkipUntil) {
                 try {
-                    val file = edge.synthesize(clean, voiceFor(clean))
-                    if (id == speakId) played = play(file)
+                    // The neural voice needs a network round-trip. Never let it delay the reply: if it is not
+                    // ready within the budget, use the instant offline voice (and skip neural for a minute).
+                    val file = withTimeoutOrNull(NEURAL_BUDGET_MS) { edge.synthesize(clean, voiceFor(clean)) }
+                    if (file == null) {
+                        neuralSkipUntil = System.currentTimeMillis() + 60_000L
+                        Log.w(TAG, "Neural voice too slow, using the offline voice for a minute")
+                    } else if (id == speakId) {
+                        played = play(file)
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -252,6 +260,8 @@ class JarvisVoiceManager(context: Context) {
     }
 
     private companion object {
+        /** Max wait for the neural (network) voice before falling back to the instant offline voice. */
+        const val NEURAL_BUDGET_MS = 1_500L
         const val TAG = "JarvisVoice"
         const val VOICE_ENGLISH = "en-US-ChristopherNeural"
         const val VOICE_MARATHI = "mr-IN-AarohiNeural"
