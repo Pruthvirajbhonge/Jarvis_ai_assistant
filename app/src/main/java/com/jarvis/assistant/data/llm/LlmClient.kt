@@ -45,16 +45,15 @@ interface LlmProvider {
     suspend fun complete(system: String, history: List<ChatMsg>, user: String): String
 }
 
-private const val GEMINI_VERIFIED = "gemini-3.5-flash-lite"
+private const val GEMINI_VERIFIED = "gemini-2.5-flash"
 
-/** Fixes typos only. (It no longer rewrites valid model names into retired ones.) */
+/** Fixes typos only. */
 private fun cleanModelName(name: String): String =
     name.trim().lowercase().replace(" ", "-").replace("vercatile", "versatile")
 
-/** gemini-1.5-* and gemini-2.0-* return 404, so they are never sent. */
 private fun usableGeminiModel(name: String): String {
     val m = cleanModelName(name)
-    return if (m.isEmpty() || m.startsWith("gemini-1.5") || m.startsWith("gemini-2.0")) GEMINI_VERIFIED else m
+    return if (m.isEmpty()) GEMINI_VERIFIED else m
 }
 
 // ---- shared HTTP ----------------------------------------------------------------------------

@@ -17,11 +17,8 @@ import kotlinx.coroutines.flow.map
 private val Context.jarvisDataStore by preferencesDataStore(name = "jarvis_settings")
 
 /** Old defaults saved by earlier versions (they return 404 / are retired). They are replaced by the new defaults. */
-private val OLD_GEMINI_MODELS = setOf(
-    "gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro",
-    "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.5-flash"
-)
-private val OLD_GROQ_MODELS = setOf("llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192", "mixtral-8x7b-32768")
+private val OLD_GEMINI_MODELS = setOf("gemini-1.0-pro", "gemini-pro")
+private val OLD_GROQ_MODELS = setOf("llama3-8b-8192", "mixtral-8x7b-32768")
 
 data class JarvisSettings(
     /** false = phone mode (default). true = commands go to the PC backend. */
@@ -75,9 +72,9 @@ data class JarvisSettings(
 
     companion object {
         const val DEFAULT_HOST = "192.168.43.59:8000"
-        const val DEFAULT_GEMINI = "gemini-3.5-flash-lite"
-        const val DEFAULT_GROQ = "openai/gpt-oss-120b"
-        const val DEFAULT_XAI = "grok-2-latest"
+        const val DEFAULT_GEMINI = "gemini-2.5-flash"
+        const val DEFAULT_GROQ = "llama-3.3-70b-versatile"
+        const val DEFAULT_XAI = "grok-3-mini"
         const val DEFAULT_OPENROUTER = "openrouter/auto"
     }
 }
