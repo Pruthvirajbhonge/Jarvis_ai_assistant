@@ -43,9 +43,26 @@ object QuickIntents {
     private val R_SETTINGS = Regex("^(open )?(wifi|wi fi|bluetooth|display|sound|battery|location|airplane|nfc|storage|accessibility) settings$")
     private val OTHER_TIME = Regex("\\b(set|timer|alarm|remind|zone|for|in|at|until|from|every)\\b")
 
+    private val MEDIA_NOUN_LATIN = Regex("\\b(music|song|songs|video|audio|track|playback|playing|gaana|gana|gaane|gani)\\b")
+    private val MEDIA_NOUN_DEV = listOf("गाणे", "गाणं", "गाणी", "गाना", "संगीत", "म्युझिक", "म्यूजिक")
+    private val STOP_LATIN = Regex("\\b(stop|pause|band|ruk|ruko|thamba)\\b")
+    private val STOP_DEV = listOf("बंद", "बन्द", "थांब", "रोक", "रुक")
+    private val APP_NAMES = Regex("\\b(youtube|spotify|whatsapp|chrome|instagram|app)\\b")
+
+    /** "stop song", "pause the music", "gaana band kara", "गाणं बंद कर" ... = stop the SOUND, never close an app. */
+    fun isMediaStop(raw: String): Boolean {
+        val t = clean(raw)
+        if (t.isEmpty() || t.split(' ').size > 7) return false
+        val noun = MEDIA_NOUN_LATIN.containsMatchIn(t) || MEDIA_NOUN_DEV.any { t.contains(it) }
+        val verb = STOP_LATIN.containsMatchIn(t) || STOP_DEV.any { t.contains(it) }
+        return noun && verb && !APP_NAMES.containsMatchIn(t)
+    }
+
     fun match(raw: String, batteryPercent: () -> Int?): Result? {
         val t = clean(raw)
         if (t.isEmpty()) return null
+        // PAUSE works in every player (KEYCODE_MEDIA_STOP is ignored by many apps)
+        if (isMediaStop(raw)) return Result.Run(act("media", "command" to "pause"))
         val words = t.split(' ')
         val n = t.replace(NOISE, " ").replace(Regex("\\s+"), " ").trim() // "what is the time" -> "time"
 
