@@ -28,20 +28,24 @@ class SpeakerVerificationEngine(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val samples = mutableListOf<FloatArray>()
 
-    @Volatile private var centroid: FloatArray? = loadCentroid()
+    private val centroids = java.util.concurrent.ConcurrentHashMap<MicRoute, FloatArray>().also { loadAll(it) }
     @Volatile var threshold: Float = prefs.getFloat(KEY_THRESHOLD, DEFAULT_THRESHOLD)
         set(value) {
             field = value.coerceIn(0.3f, 0.95f)
             prefs.edit().putFloat(KEY_THRESHOLD, field).apply()
         }
 
-    val isEnrolled: Boolean get() = centroid != null
+    /** true when at least one microphone has a voiceprint. */
+    val isEnrolled: Boolean get() = centroids.isNotEmpty()
 
-    /** Microphone the voiceprint was recorded with (null = enrolled before this check existed). */
-    val enrolledRoute: String? get() = prefs.getString(KEY_ROUTE, null)
+    /** Microphones that have a voiceprint, e.g. "PHONE, BLUETOOTH". */
+    val enrolledRoute: String? get() = centroids.keys.map { it.name }.sorted().joinToString(", ").ifEmpty { null }
 
-    /** A voiceprint is only valid for the microphone it was recorded with. */
-    fun routeMatches(route: MicRoute): Boolean = enrolledRoute.let { it == null || it == route.name }
+    fun hasVoiceprint(route: MicRoute): Boolean = centroids.containsKey(route)
+
+    /** A voiceprint is only valid for the microphone it was recorded with (one voiceprint per mic). */
+    fun routeMatches(route: MicRoute): Boolean = hasVoiceprint(route)
+
     val sampleCount: Int get() = synchronized(samples) { samples.size }
 
     // ---- enrollment -------------------------------------------------------------------------
@@ -57,7 +61,7 @@ class SpeakerVerificationEngine(context: Context) {
      * (low value = inconsistent recordings, e.g. noise or another speaker), or null if
      * there were not enough samples.
      */
-    fun finishEnrollment(): Float? {
+    fun finishEnrollment(route: MicRoute = MicRouting.selected(appCtx)): Float? {
         val snapshot = synchronized(samples) { samples.toList() }
         if (snapshot.size < MIN_SAMPLES) return null
         val dim = snapshot[0].size
@@ -65,22 +69,23 @@ class SpeakerVerificationEngine(context: Context) {
         for (s in snapshot) for (i in 0 until dim) mean[i] += s[i] / snapshot.size
         val c = l2(mean)
         val worst = snapshot.minOf { cosine(it, c) }
-        centroid = c
-        prefs.edit().putString(KEY_CENTROID, c.joinToString(","))
-            .putString(KEY_ROUTE, MicRouting.selected(appCtx).name).apply()
+        centroids[route] = c
+        prefs.edit().putString(KEY_CENTROID + "_" + route.name, c.joinToString(",")).apply()
         return worst
     }
 
     fun clearEnrollment() {
-        centroid = null
+        centroids.clear()
         synchronized(samples) { samples.clear() }
-        prefs.edit().remove(KEY_CENTROID).remove(KEY_ROUTE).apply()
+        val e = prefs.edit().remove(KEY_CENTROID).remove(KEY_ROUTE)
+        for (r in MicRoute.values()) e.remove(KEY_CENTROID + "_" + r.name)
+        e.apply()
     }
 
     // ---- verification -----------------------------------------------------------------------
 
     fun verify(xvector: FloatArray): VerificationResult {
-        val owner = centroid
+        val owner = centroids[MicRouting.selected(appCtx)]
             ?: return VerificationResult(isMatched = false, confidenceScore = 0f, reason = "No Voiceprint Enrolled")
         val score = cosine(l2(xvector), owner)
         val ok = score >= threshold
@@ -110,10 +115,15 @@ class SpeakerVerificationEngine(context: Context) {
         return FloatArray(v.size) { v[it] / n }
     }
 
-    private fun loadCentroid(): FloatArray? =
-        prefs.getString(KEY_CENTROID, null)
-            ?.split(",")
-            ?.mapNotNull { it.toFloatOrNull() }
-            ?.takeIf { it.isNotEmpty() }
-            ?.toFloatArray()
+    private fun parse(str: String?): FloatArray? =
+        str?.split(",")?.mapNotNull { it.toFloatOrNull() }?.takeIf { it.isNotEmpty() }?.toFloatArray()
+
+    private fun loadAll(into: MutableMap<MicRoute, FloatArray>) {
+        for (r in MicRoute.values()) parse(prefs.getString(KEY_CENTROID + "_" + r.name, null))?.let { into[r] = it }
+        // voiceprint saved by an older version: it belongs to the mic it was recorded with (default PHONE)
+        parse(prefs.getString(KEY_CENTROID, null))?.let { old ->
+            val r = MicRoute.values().firstOrNull { it.name == prefs.getString(KEY_ROUTE, null) } ?: MicRoute.PHONE
+            if (!into.containsKey(r)) into[r] = old
+        }
+    }
 }

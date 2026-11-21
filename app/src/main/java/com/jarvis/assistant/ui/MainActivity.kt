@@ -38,6 +38,7 @@ import com.jarvis.assistant.databinding.DialogSettingsBinding
 import com.jarvis.assistant.service.JarvisBackgroundService
 import com.jarvis.assistant.speech.VoiceInteractionManager.Mode
 import com.jarvis.assistant.speech.MicPrefs
+import com.jarvis.assistant.speech.MicRouting
 import com.jarvis.assistant.speech.SpeakerEnroller
 import kotlinx.coroutines.launch
 
@@ -558,6 +559,15 @@ class MainActivity : AppCompatActivity() {
             b.switchOrb.isChecked = current.floatingOrb
             b.switchVoiceAuth.isChecked = current.voiceAuthEnabled
             b.switchVoiceModeA.isChecked = current.voiceAuthMode == "MODE_A"
+
+            b.switchAutoBluetooth.setOnCheckedChangeListener(null)
+            b.switchAutoBluetooth.isChecked = MicRouting.autoBluetooth(applicationContext)
+            b.switchAutoBluetooth.setOnCheckedChangeListener { _, checked ->
+                MicRouting.setAutoBluetooth(applicationContext, checked)
+                voiceManager?.let { vm ->
+                    if (current.wakeWordEnabled) { vm.stopWake(); vm.startWake() }
+                }
+            }
 
             b.switchBluetoothMic.setOnCheckedChangeListener(null)
             b.switchBluetoothMic.isChecked = MicPrefs.useBluetoothMic(applicationContext)

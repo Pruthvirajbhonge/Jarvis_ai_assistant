@@ -103,6 +103,7 @@ class VoskWakeEngine(
     @SuppressLint("MissingPermission")
     private fun runLoop(g: Int, prev: Thread?) {
         var retryable = true
+        var btRouter: BluetoothMicRouter? = null
         val authActive = isVoiceAuthEnabled?.invoke() == true
         try {
             // Fail closed only when voice auth is enabled: never accept everyone when auth is ON but not enrolled.
@@ -114,9 +115,21 @@ class VoskWakeEngine(
             if (authActive && speakerEngine != null && !speakerEngine.routeMatches(route)) {
                 retryable = false
                 throw IllegalStateException(
-                    "Voice was enrolled with the ${speakerEngine.enrolledRoute} mic but the $route mic is selected. " +
-                        "Select the same mic or enroll again."
+                    "No voiceprint for the $route mic (enrolled: ${speakerEngine.enrolledRoute}). Enroll while using this mic."
                 )
+            }
+            if (route == MicRoute.PHONE && authActive && speakerEngine?.hasVoiceprint(MicRoute.BLUETOOTH) == false &&
+                MicRouting.autoBluetooth(context) && BluetoothMicRouter.findInput(context) != null
+            ) {
+                onStatus("Bluetooth mic detected but it has no voiceprint. Using the phone mic. Enroll with the headset connected to use it.")
+            }
+            if (route == MicRoute.BLUETOOTH) {
+                btRouter = BluetoothMicRouter(context)
+                if (!btRouter!!.start()) {
+                    btRouter = null
+                    if (!MicPrefs.useBluetoothMic(context)) MicRouting.blockAutoBluetooth(60_000L)
+                    throw IllegalStateException("Bluetooth mic is not available, using the phone mic.")
+                }
             }
             // Wait for the previous loop to release the microphone (stop() is asynchronous).
             // Without this, a quick stop()->start() finds the mic busy and fails.
@@ -203,6 +216,8 @@ class VoskWakeEngine(
                 }
             }
             onFailure(e.message ?: "Wake engine failed.", retryable)
+        } finally {
+            btRouter?.stop()
         }
     }
 

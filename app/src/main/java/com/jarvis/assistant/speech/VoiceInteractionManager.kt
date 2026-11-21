@@ -126,13 +126,19 @@ class VoiceInteractionManager(context: Context) {
         override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) = routeChanged("disconnected")
     }
 
+    private var activeRoute: MicRoute? = null
+
     private fun routeChanged(what: String) {
-        if (!wakeEnabled || MicRouting.selected(appContext) == MicRoute.PHONE) return
-        onError?.invoke("Audio device $what. Selected mic: ${MicRouting.selected(appContext)}.")
+        val now = MicRouting.selected(appContext)
+        if (!wakeEnabled || now == activeRoute) return
+        activeRoute = now
+        onError?.invoke("Audio device $what. Using the $now mic.")
         if (mode == Mode.WAKE) { engine.stop(); setMode(Mode.IDLE); scheduleWake(500) }
     }
 
     init {
+        // Bluetooth is used only if voice auth is OFF, or the owner enrolled a voiceprint with the Bluetooth mic.
+        MicRouting.btAllowed = { isVoiceAuthEnabledSupplier?.invoke() != true || verifier.hasVoiceprint(MicRoute.BLUETOOTH) }
         (appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager)
             .registerAudioDeviceCallback(deviceCallback, main)
         voiceOut.onSpeechDone = {
@@ -292,6 +298,7 @@ class VoiceInteractionManager(context: Context) {
             cancelRecognizer()
 
             setMode(Mode.WAKE)
+            activeRoute = MicRouting.selected(appContext)
             engine.start()
 
         } else {
@@ -397,7 +404,7 @@ class VoiceInteractionManager(context: Context) {
         cancelCommandTimeout()
         cancelRecognizer()
 
-        if (MicPrefs.useBluetoothMic(appContext)) {
+        if (MicRouting.selected(appContext) == MicRoute.BLUETOOTH) {
             Thread { ensureBluetoothMic() }.start()
         }
 

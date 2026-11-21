@@ -65,11 +65,19 @@
                 android:textColor="#FFFFFF" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchAutoBluetooth"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Auto-switch to Bluetooth mic when connected (Recommended)"
+                android:textColor="#FFFFFF" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/switchBluetoothMic"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="Use Bluetooth headset mic (Auto-Switching)"
+                android:text="Force use Bluetooth headset mic (Always ON)"
                 android:textColor="#FFFFFF" />
 
             <com.google.android.material.materialswitch.MaterialSwitch

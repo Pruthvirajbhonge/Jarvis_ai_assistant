@@ -55,7 +55,7 @@ class SpeakerEnroller(
             val spkModel = SpeakerModel(spkModelDir.absolutePath)
 
             val sampleRate = 16000f
-            val route = MicRouting.selected(context)
+            val route = MicRouting.enrollRoute(context)
             if (route == MicRoute.BLUETOOTH) {
                 btRouter = BluetoothMicRouter(context)
                 if (!btRouter!!.start()) throw IllegalStateException("Bluetooth mic is not available. Connect it or select the phone mic.")
@@ -131,7 +131,7 @@ class SpeakerEnroller(
             }
 
             if (sampleCount >= targetSamples) {
-                val quality = engine.finishEnrollment()
+                val quality = engine.finishEnrollment(route)
                 if (quality != null) {
                     onDone(true, "Voiceprint enrolled successfully! (${(quality * 100).toInt()}% quality)")
                 } else {
