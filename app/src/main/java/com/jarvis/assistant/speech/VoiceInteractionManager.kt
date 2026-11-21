@@ -39,6 +39,7 @@ class VoiceInteractionManager(context: Context) {
     private var commandTimeoutRunnable: Runnable? = null
 
     private val COMMAND_START_TIMEOUT = 12_000L
+    private val MAX_ENGINE_RETRIES = 3
 
     // Silence detection hints for SpeechRecognizer.
     private val commandCompleteSilence = 1_500L
@@ -51,6 +52,25 @@ class VoiceInteractionManager(context: Context) {
     val enrollmentManager = VoiceEnrollmentManager(appContext)
     @Volatile var isMicMuted: Boolean = false
     var isModeASupplier: (() -> Boolean)? = null
+    var isVoiceAuthEnabledSupplier: (() -> Boolean)? = null
+
+    private var btRouter: BluetoothMicRouter? = null
+
+    private fun ensureBluetoothMic() {
+        if (MicPrefs.useBluetoothMic(appContext) || BluetoothMicRouter.findInput(appContext) != null) {
+            if (btRouter == null) {
+                btRouter = BluetoothMicRouter(appContext)
+            }
+            btRouter?.start()
+        } else {
+            stopBluetoothMic()
+        }
+    }
+
+    private fun stopBluetoothMic() {
+        btRouter?.stop()
+        btRouter = null
+    }
 
     private val engine = VoskWakeEngine(
         context = appContext,
@@ -60,11 +80,12 @@ class VoiceInteractionManager(context: Context) {
         onStatus = { msg ->
             main.post { onError?.invoke(msg) }
         },
-        onFailure = { msg ->
-            main.post { engineFailed(msg) }
+        onFailure = { msg, retryable ->
+            main.post { engineFailed(msg, retryable) }
         },
         speakerEngine = verifier,
-        isModeA = { isModeASupplier?.invoke() == true }
+        isModeA = { isModeASupplier?.invoke() == true },
+        isVoiceAuthEnabled = { isVoiceAuthEnabledSupplier?.invoke() == true }
     )
 
     @Volatile
@@ -104,6 +125,7 @@ class VoiceInteractionManager(context: Context) {
 
     fun startWake() = runOnMain {
         wakeEnabled = true
+        engineRetries = 0
 
         if (isMicMuted) {
             onError?.invoke("Microphone is muted.")
@@ -154,6 +176,7 @@ class VoiceInteractionManager(context: Context) {
         }
 
         engine.stop()
+        stopBluetoothMic()
         main.removeCallbacksAndMessages(null)
         if (mode == Mode.WAKE || mode == Mode.COMMAND) {
             cancelRecognizer()
@@ -173,8 +196,9 @@ class VoiceInteractionManager(context: Context) {
     fun speak(text: String) = runOnMain {
         if (text.isBlank()) return@runOnMain
 
+        engine.stop()
+        stopBluetoothMic()
         if (mode == Mode.WAKE) {
-            engine.stop()
             main.removeCallbacksAndMessages(null)
             cancelRecognizer()
             setMode(Mode.IDLE)
@@ -247,19 +271,35 @@ class VoiceInteractionManager(context: Context) {
 
     private fun onEngineWake(capturedText: String? = null) {
         if (mode != Mode.WAKE) return
+        engineRetries = 0
 
         setMode(Mode.IDLE)
         onWakeWord?.invoke(capturedText)
     }
 
-    private fun engineFailed(msg: String) {
-        useEngine = false
+    private var engineRetries = 0
 
-        onError?.invoke("$msg Using basic wake mode.")
+    /**
+     * The OLD version switched to SpeechRecognizer and looped it forever: every restart made the
+     * system "beep" and flicker the mic indicator, and it bypassed the owner-voice check.
+     * Now: retry the Vosk engine a few times with a growing delay, then stop quietly.
+     */
+    private fun engineFailed(msg: String, retryable: Boolean) {
+        if (mode == Mode.WAKE) setMode(Mode.IDLE)
+        if (!wakeEnabled) return
 
-        if (wakeEnabled && mode != Mode.COMMAND && !speaking) {
-            beginRecognition(Mode.WAKE)
+        if (retryable && engineRetries < MAX_ENGINE_RETRIES) {
+            engineRetries++
+            onError?.invoke("$msg Retrying ($engineRetries/$MAX_ENGINE_RETRIES)…")
+            scheduleWake(3_000L * engineRetries)
+            return
         }
+
+        wakeEnabled = false
+        onError?.invoke(
+            if (retryable) "$msg Wake listening stopped. Turn wake word off and on to retry."
+            else msg
+        )
     }
 
     // --------------------------------------------------
@@ -327,6 +367,10 @@ class VoiceInteractionManager(context: Context) {
 
         cancelCommandTimeout()
         cancelRecognizer()
+
+        if (MicPrefs.useBluetoothMic(appContext)) {
+            Thread { ensureBluetoothMic() }.start()
+        }
 
         if (!SpeechRecognizer.isRecognitionAvailable(appContext)) {
             setMode(Mode.IDLE)
@@ -438,6 +482,7 @@ class VoiceInteractionManager(context: Context) {
         cancelCommandTimeout()
 
         cancelRecognizer()
+        stopBluetoothMic()
 
         setMode(Mode.IDLE)
 

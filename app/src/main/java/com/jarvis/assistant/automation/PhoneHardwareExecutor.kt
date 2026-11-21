@@ -350,6 +350,7 @@ class PhoneHardwareExecutor(context: Context) {
     private fun parseCloseApp(raw: String): PhoneAction? {
         val t = raw.lowercase().trim()
         if (!CLOSE_WORDS.containsMatchIn(t)) return null
+        if (QuickIntents.isMediaStop(raw)) return null // "stop song" = stop the music, not close an app
         val appName = when {
             t.contains("whatsapp") -> "whatsapp"
             t.contains("youtube") -> "youtube"
@@ -384,7 +385,18 @@ class PhoneHardwareExecutor(context: Context) {
 
     private fun closeApp(name: String?): Outcome {
         val service = JarvisAccessibilityService.instance
-        val appLabel = if (name.isNullOrBlank() || name == "app") "the app" else name
+        val generic = name.isNullOrBlank() || name in setOf("app", "this app", "current app", "the app")
+        val appLabel = if (generic) "the app" else name!!
+
+        // Android cannot kill other apps. All we can do is leave the app that is on screen (HOME), so only
+        // do that when the user asked for the app that is really in front. Before, ANY name pressed HOME,
+        // which is why "stop song" sent the Jarvis app to the background.
+        if (!generic) {
+            val front = service?.let { foregroundLabel(it) }
+            val matches = front != null && (front.contains(name!!, true) || name.contains(front, true))
+            if (!matches) return Outcome("$appLabel isn't on the screen, sir. I can only close the app in front.", false)
+        }
+
         return if (service != null) {
             service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
             Outcome("Closed $appLabel.", true)
@@ -401,6 +413,12 @@ class PhoneHardwareExecutor(context: Context) {
             }
         }
     }
+
+    private fun foregroundLabel(service: JarvisAccessibilityService): String? = try {
+        val pkg = service.rootInActiveWindow?.packageName?.toString()
+        if (pkg == null) null
+        else app.packageManager.getApplicationLabel(app.packageManager.getApplicationInfo(pkg, 0)).toString()
+    } catch (e: Exception) { null }
 
     private fun openApp(name: String?): Outcome {
         if (name.isNullOrBlank()) return Outcome("Which app should I open?", false)

@@ -37,6 +37,8 @@ import com.jarvis.assistant.databinding.ActivityMainBinding
 import com.jarvis.assistant.databinding.DialogSettingsBinding
 import com.jarvis.assistant.service.JarvisBackgroundService
 import com.jarvis.assistant.speech.VoiceInteractionManager.Mode
+import com.jarvis.assistant.speech.MicPrefs
+import com.jarvis.assistant.speech.SpeakerEnroller
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -58,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
             startJarvisBackgroundService()
             val callingDenied = results[Manifest.permission.CALL_PHONE] == false ||
-                results[Manifest.permission.READ_CONTACTS] == false
+                    results[Manifest.permission.READ_CONTACTS] == false
             if (callingDenied) {
                 Toast.makeText(
                     this,
@@ -128,15 +130,15 @@ class MainActivity : AppCompatActivity() {
             !Settings.canDrawOverlays(this) && promptedSetup.add("overlay") -> askSetup(
                 "Allow “Display over other apps”",
                 "Android blocks opening apps, maps, SMS and calls while Jarvis is in the background. " +
-                    "This permission lets Jarvis do them anyway. Keep the floating orb ON.\n\n" +
-                    "Xiaomi/Oppo/Vivo/Realme: also enable “Display pop-up windows while running in the background” " +
-                    "and Autostart in App info → Permissions.",
+                        "This permission lets Jarvis do them anyway. Keep the floating orb ON.\n\n" +
+                        "Xiaomi/Oppo/Vivo/Realme: also enable “Display pop-up windows while running in the background” " +
+                        "and Autostart in App info → Permissions.",
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
             )
             JarvisAccessibilityService.instance == null && promptedSetup.add("accessibility") -> askSetup(
                 "Turn on Jarvis automation",
                 "Needed to tap buttons, type, send WhatsApp messages and to check that an app really opened. " +
-                    "Open Accessibility → Installed apps → J.A.R.V.I.S. → turn on.",
+                        "Open Accessibility → Installed apps → J.A.R.V.I.S. → turn on.",
                 Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             )
             !pm.isIgnoringBatteryOptimizations(packageName) && promptedSetup.add("battery") -> askSetup(
@@ -557,6 +559,16 @@ class MainActivity : AppCompatActivity() {
             b.switchVoiceAuth.isChecked = current.voiceAuthEnabled
             b.switchVoiceModeA.isChecked = current.voiceAuthMode == "MODE_A"
 
+            b.switchBluetoothMic.setOnCheckedChangeListener(null)
+            b.switchBluetoothMic.isChecked = MicPrefs.useBluetoothMic(applicationContext)
+            b.switchBluetoothMic.setOnCheckedChangeListener { _, checked ->
+                MicPrefs.setUseBluetoothMic(applicationContext, checked)
+                // restart wake listening so the new mic source is used
+                voiceManager?.let { vm ->
+                    if (current.wakeWordEnabled) { vm.stopWake(); vm.startWake() }
+                }
+            }
+
             val verifier = voiceManager?.verifier
             b.tvVoiceprintStatus.text = if (verifier?.isEnrolled == true) {
                 "Status: Enrolled (${verifier.sampleCount} samples, threshold: ${(current.speakerThreshold * 100).toInt()}%)"
@@ -564,37 +576,31 @@ class MainActivity : AppCompatActivity() {
                 "Status: No voiceprint enrolled yet."
             }
 
+
             b.btnEnrollVoiceprint.setOnClickListener {
-                enrollment?.startEnrollment()
-                fun recordNextSample(step: Int) {
-                    if (step > 3) return
-                    val phrase = when (step) {
-                        1 -> "Sample 1/3: Speak phrase 'Jarvis, this is my voice.'"
-                        2 -> "Sample 2/3: Speak phrase 'System online, voice authentication active.'"
-                        3 -> "Sample 3/3: Speak phrase 'I am the owner of this device.'"
-                        else -> ""
-                    }
-                    MaterialAlertDialogBuilder(this@MainActivity)
-                        .setTitle("Voiceprint Enrollment ($step/3)")
-                        .setMessage("$phrase\n\nTap 'Record' and speak into the microphone for 2 seconds.")
-                        .setPositiveButton("Record") { _, _ ->
-                            Toast.makeText(this@MainActivity, "Recording $step/3... Speak now!", Toast.LENGTH_SHORT).show()
-                            captureAudioSample { pcm ->
-                                val xvector = FloatArray(128) { (pcm.getOrNull(it % pcm.size)?.toFloat() ?: 0f) / 32768f }
-                                val finished = enrollment?.addXvectorSample(xvector) == true
-                                if (finished) {
-                                    b.tvVoiceprintStatus.text = "Status: Enrolled (3 samples, threshold: ${(current.speakerThreshold * 100).toInt()}%)"
-                                    Toast.makeText(this@MainActivity, "Voiceprint Enrollment Complete!", Toast.LENGTH_LONG).show()
-                                } else {
-                                    recordNextSample(step + 1)
-                                }
-                            }
+                val vm = voiceManager ?: return@setOnClickListener
+                val v = vm.verifier
+                vm.stopWake() // microphone must be free for enrollment
+                b.tvVoiceprintStatus.text = "Say 5 phrases, e.g. \"Jarvis open camera\"…"
+                SpeakerEnroller(
+                    context = applicationContext,
+                    engine = v,
+                    onProgress = { done: Int, total: Int, heard: String ->
+                        runOnUiThread { b.tvVoiceprintStatus.text = "Recorded $done/$total (\"$heard\"). Say the next phrase." }
+                    },
+                    onStatus = { msg: String ->
+                        runOnUiThread { if (msg.isNotBlank()) b.tvVoiceprintStatus.text = msg }
+                    },
+                    onDone = { ok: Boolean, msg: String ->
+                        runOnUiThread {
+                            b.tvVoiceprintStatus.text = "Status: $msg"
+                            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                            if (ok && current.wakeWordEnabled) vm.startWake()
                         }
-                        .setNegativeButton("Cancel", null)
-                        .show()
-                }
-                recordNextSample(1)
+                    }
+                ).start()
             }
+
 
             b.btnDeleteVoiceprint.setOnClickListener {
                 enrollment?.deleteVoiceprint()
@@ -656,8 +662,15 @@ class MainActivity : AppCompatActivity() {
         val wanted = mutableListOf(
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.CALL_PHONE,
-            Manifest.permission.READ_CONTACTS
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.READ_PHONE_STATE
         )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            wanted.add(Manifest.permission.ANSWER_PHONE_CALLS)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            wanted.add(Manifest.permission.BLUETOOTH_CONNECT)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             wanted.add(Manifest.permission.POST_NOTIFICATIONS)
         }

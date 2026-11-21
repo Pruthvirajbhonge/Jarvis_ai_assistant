@@ -8,8 +8,14 @@ import com.jarvis.assistant.data.model.parsePhoneAction
 import com.jarvis.assistant.data.model.str
 import com.jarvis.assistant.data.prefs.JarvisSettings
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -194,6 +200,7 @@ class OpenAiCompatProvider(
         val body = buildJsonObject {
             put("model", model)
             put("temperature", 0.6)
+            put("max_tokens", 350) // spoken replies are short: stops long, slow generations
             put("messages", buildJsonArray {
                 add(msg("system", system))
                 history.forEach { add(msg(it.role, it.text)) }
@@ -249,26 +256,59 @@ fun JarvisSettings.buildProviders(client: OkHttpClient): List<LlmProvider> = bui
 class LlmChain {
     private val cooldownUntil = ConcurrentHashMap<String, Long>()
 
-    suspend fun complete(providers: List<LlmProvider>, system: String, history: List<ChatMsg>, user: String): ChainResult {
+    /**
+     * "Hedged" failover: the first provider starts immediately; if it has not answered within
+     * [hedgeAfterMs] (or it fails) the NEXT provider is started in parallel. The first good answer wins and
+     * the others are cancelled. Before, a slow provider could block up to 25 s before the next one was tried.
+     */
+    suspend fun complete(
+        providers: List<LlmProvider>, system: String, history: List<ChatMsg>, user: String,
+        hedgeAfterMs: Long = 2_500L
+    ): ChainResult = coroutineScope {
         val now = System.currentTimeMillis()
         val ready = providers.filter { (cooldownUntil[it.name] ?: 0L) <= now }.ifEmpty { providers }
-        val errors = mutableListOf<String>()
-        for (p in ready) {
-            try {
-                val text = p.complete(system, history, user)
-                cooldownUntil.remove(p.name)
-                return ChainResult(text, p.name, errors)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: ProviderException) {
-                errors += "${p.name}: ${e.message}"
-                cooldownUntil[p.name] = now + if (e.fatal) 600_000L else 60_000L
-            } catch (e: Exception) {
-                errors += "${p.name}: ${e.message ?: e.javaClass.simpleName}"
-                cooldownUntil[p.name] = now + 30_000L
+        val errors = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val winner = CompletableDeferred<ChainResult>()
+        val failures = java.util.concurrent.atomic.AtomicInteger(0)
+        val failSignal = Channel<Unit>(Channel.UNLIMITED)
+
+        fun fail(p: LlmProvider, msg: String, cooldownMs: Long) {
+            errors += "${p.name}: $msg"
+            cooldownUntil[p.name] = now + cooldownMs
+            failSignal.trySend(Unit)
+            if (failures.incrementAndGet() == ready.size) winner.completeExceptionally(AllProvidersFailed(errors.toList()))
+        }
+
+        val jobs = ready.map { p ->
+            launch(start = CoroutineStart.LAZY) {
+                try {
+                    val text = p.complete(system, history, user)
+                    cooldownUntil.remove(p.name)
+                    winner.complete(ChainResult(text, p.name, errors.toList()))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: ProviderException) {
+                    fail(p, e.message ?: "error", if (e.fatal) 600_000L else 60_000L)
+                } catch (e: Exception) {
+                    fail(p, e.message ?: e.javaClass.simpleName, 30_000L)
+                }
             }
         }
-        throw AllProvidersFailed(errors)
+        val scheduler = launch {
+            jobs[0].start()
+            for (i in 1 until jobs.size) {
+                withTimeoutOrNull(hedgeAfterMs) { failSignal.receive() }
+                if (winner.isCompleted) break
+                jobs[i].start()
+            }
+        }
+        try {
+            winner.await()
+        } finally {
+            scheduler.cancel()
+            jobs.forEach { it.cancel() }
+            failSignal.close()
+        }
     }
 }
 

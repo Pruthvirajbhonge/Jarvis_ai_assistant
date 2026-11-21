@@ -20,6 +20,7 @@ import com.jarvis.assistant.data.prefs.JarvisSettings
 import com.jarvis.assistant.data.prefs.SettingsStore
 import com.jarvis.assistant.data.repo.JarvisRepository
 import com.jarvis.assistant.speech.VoiceInteractionManager
+import com.jarvis.assistant.automation.QuickIntents
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -125,6 +126,7 @@ class JarvisCore(private val app: Application) {
         }
 
         voice.isModeASupplier = { latest.voiceAuthEnabled && latest.voiceAuthMode == "MODE_A" }
+        voice.isVoiceAuthEnabledSupplier = { latest.voiceAuthEnabled }
 
         // Mirror persisted settings into the UI state (works even before the service starts).
         scope.launch {
@@ -152,7 +154,8 @@ class JarvisCore(private val app: Application) {
         val text = prompt.trim()
         if (text.isEmpty()) return
         taskContextEngine.updateTaskFromUserCommand(text, contextTracker.currentApp.value)
-        suggestionController.onContextEvent(contextTracker.currentApp.value)
+        // (removed) suggestionController.onContextEvent(...) here: it fired a SECOND AI request at the
+        // same moment as the user's command, so both competed for the same provider and rate limit.
         scope.launch {
             // "PC mode" / "phone mode" are handled locally so they always work, even offline.
             ModeCommand.parse(text)?.let { toPc ->
@@ -180,10 +183,32 @@ class JarvisCore(private val app: Application) {
                     voice.speak(local.spoken)
                     return@launch
                 }
+
+                // Instant rule-based answers/actions (time, battery, home/back, media, screenshot...): no AI.
+                when (val q = QuickIntents.match(text) { batteryPercent() }) {
+                    is QuickIntents.Result.Say -> {
+                        _state.update { it.copy(busy = false, reply = q.text, note = null) }
+                        voice.speak(q.text)
+                        return@launch
+                    }
+                    is QuickIntents.Result.Run -> {
+                        val out = executor.execute(q.action)
+                        _state.update { it.copy(busy = false, reply = out, lastAction = out, note = null) }
+                        voice.speak(out)
+                        return@launch
+                    }
+                    null -> Unit
+                }
             }
 
             _state.update { it.copy(busy = true, note = null) }
-            val result = repository.ask(text)
+            // If the AI is slow, say something after a moment instead of staying silent.
+            val ack = launch {
+                delay(SPOKEN_ACK_AFTER_MS)
+                _state.update { it.copy(note = "Thinking…") }
+                voice.speak("One moment, sir.")
+            }
+            val result = try { repository.ask(text) } finally { ack.cancel() }
             val action = result.action
             var spoken = result.reply
             var executed: String? = null
@@ -358,3 +383,6 @@ class JarvisCore(private val app: Application) {
             "Recent notifications:\n${notes.ifBlank { "(none)" }}"
     }
 }
+
+/** Speak a short "one moment" if the AI has not answered after this long. */
+private const val SPOKEN_ACK_AFTER_MS = 2_500L
