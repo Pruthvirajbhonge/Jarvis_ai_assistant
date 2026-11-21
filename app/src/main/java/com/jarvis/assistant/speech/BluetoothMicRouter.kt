@@ -100,10 +100,10 @@ class BluetoothMicRouter(context: Context) {
     private fun isScoOn(audioManager: AudioManager): Boolean = audioManager.isBluetoothScoOn
 
     companion object {
+        /** Bluetooth devices that can capture audio (SCO / BLE headset). A2DP and BLE speakers are output only. */
         fun isBluetooth(d: AudioDeviceInfo): Boolean =
             d.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
-                d.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                (Build.VERSION.SDK_INT >= 31 && (d.type == AudioDeviceInfo.TYPE_BLE_HEADSET || d.type == AudioDeviceInfo.TYPE_BLE_SPEAKER))
+                (Build.VERSION.SDK_INT >= 31 && d.type == AudioDeviceInfo.TYPE_BLE_HEADSET)
 
         fun findInput(context: Context): AudioDeviceInfo? {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager

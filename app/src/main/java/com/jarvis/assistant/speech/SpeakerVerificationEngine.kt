@@ -13,6 +13,8 @@ import kotlin.math.sqrt
  * Verification: verify(xvector) compares against the stored owner centroid (cosine similarity).
  */
 class SpeakerVerificationEngine(context: Context) {
+    private val appCtx = context.applicationContext
+
 
     companion object {
         const val MIN_SAMPLES = 3
@@ -20,6 +22,7 @@ class SpeakerVerificationEngine(context: Context) {
         private const val PREFS = "jarvis_voiceprint"
         private const val KEY_CENTROID = "centroid"
         private const val KEY_THRESHOLD = "threshold"
+        private const val KEY_ROUTE = "route"
     }
 
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -33,6 +36,12 @@ class SpeakerVerificationEngine(context: Context) {
         }
 
     val isEnrolled: Boolean get() = centroid != null
+
+    /** Microphone the voiceprint was recorded with (null = enrolled before this check existed). */
+    val enrolledRoute: String? get() = prefs.getString(KEY_ROUTE, null)
+
+    /** A voiceprint is only valid for the microphone it was recorded with. */
+    fun routeMatches(route: MicRoute): Boolean = enrolledRoute.let { it == null || it == route.name }
     val sampleCount: Int get() = synchronized(samples) { samples.size }
 
     // ---- enrollment -------------------------------------------------------------------------
@@ -57,14 +66,15 @@ class SpeakerVerificationEngine(context: Context) {
         val c = l2(mean)
         val worst = snapshot.minOf { cosine(it, c) }
         centroid = c
-        prefs.edit().putString(KEY_CENTROID, c.joinToString(",")).apply()
+        prefs.edit().putString(KEY_CENTROID, c.joinToString(","))
+            .putString(KEY_ROUTE, MicRouting.selected(appCtx).name).apply()
         return worst
     }
 
     fun clearEnrollment() {
         centroid = null
         synchronized(samples) { samples.clear() }
-        prefs.edit().remove(KEY_CENTROID).apply()
+        prefs.edit().remove(KEY_CENTROID).remove(KEY_ROUTE).apply()
     }
 
     // ---- verification -----------------------------------------------------------------------

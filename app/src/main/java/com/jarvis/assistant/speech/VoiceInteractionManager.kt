@@ -2,6 +2,9 @@ package com.jarvis.assistant.speech
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -57,7 +60,7 @@ class VoiceInteractionManager(context: Context) {
     private var btRouter: BluetoothMicRouter? = null
 
     private fun ensureBluetoothMic() {
-        if (MicPrefs.useBluetoothMic(appContext) || BluetoothMicRouter.findInput(appContext) != null) {
+        if (MicRouting.selected(appContext) == MicRoute.BLUETOOTH) { // only when the user selected it
             if (btRouter == null) {
                 btRouter = BluetoothMicRouter(appContext)
             }
@@ -107,7 +110,31 @@ class VoiceInteractionManager(context: Context) {
 
     private var onNextSpeechDone: (() -> Unit)? = null
 
+    // Self-heal: if wake is enabled but nothing is listening (a restart callback was wiped), start it again.
+    private val watchdogHandler = Handler(Looper.getMainLooper())
+    private val watchdog = object : Runnable {
+        override fun run() {
+            if (wakeEnabled && !speaking && !isMicMuted && mode == Mode.IDLE) enterWake()
+            if (wakeEnabled) watchdogHandler.postDelayed(this, 15_000L)
+        }
+    }
+
+    // Detect microphone route changes (headset plugged/unplugged). Only matters when the selected mic
+    // is a headset: the PHONE route is pinned to the built-in mic and never changes silently.
+    private val deviceCallback = object : AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) = routeChanged("connected")
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) = routeChanged("disconnected")
+    }
+
+    private fun routeChanged(what: String) {
+        if (!wakeEnabled || MicRouting.selected(appContext) == MicRoute.PHONE) return
+        onError?.invoke("Audio device $what. Selected mic: ${MicRouting.selected(appContext)}.")
+        if (mode == Mode.WAKE) { engine.stop(); setMode(Mode.IDLE); scheduleWake(500) }
+    }
+
     init {
+        (appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager)
+            .registerAudioDeviceCallback(deviceCallback, main)
         voiceOut.onSpeechDone = {
             val pending = onNextSpeechDone
             onNextSpeechDone = null
@@ -126,6 +153,8 @@ class VoiceInteractionManager(context: Context) {
     fun startWake() = runOnMain {
         wakeEnabled = true
         engineRetries = 0
+        watchdogHandler.removeCallbacks(watchdog)
+        watchdogHandler.postDelayed(watchdog, 15_000L)
 
         if (isMicMuted) {
             onError?.invoke("Microphone is muted.")
@@ -139,6 +168,7 @@ class VoiceInteractionManager(context: Context) {
 
     fun stopWake() = runOnMain {
         wakeEnabled = false
+        watchdogHandler.removeCallbacks(watchdog)
 
         engine.stop()
 
@@ -288,18 +318,17 @@ class VoiceInteractionManager(context: Context) {
         if (mode == Mode.WAKE) setMode(Mode.IDLE)
         if (!wakeEnabled) return
 
-        if (retryable && engineRetries < MAX_ENGINE_RETRIES) {
+        if (retryable) {
+            // Never give up while wake is enabled: the mic may be busy, or a headset may reconnect later.
             engineRetries++
-            onError?.invoke("$msg Retrying ($engineRetries/$MAX_ENGINE_RETRIES)…")
-            scheduleWake(3_000L * engineRetries)
+            val delayMs = minOf(3_000L * engineRetries, 30_000L)
+            onError?.invoke("$msg Retrying in ${delayMs / 1000}s…")
+            scheduleWake(delayMs)
             return
         }
 
         wakeEnabled = false
-        onError?.invoke(
-            if (retryable) "$msg Wake listening stopped. Turn wake word off and on to retry."
-            else msg
-        )
+        onError?.invoke(msg)
     }
 
     // --------------------------------------------------

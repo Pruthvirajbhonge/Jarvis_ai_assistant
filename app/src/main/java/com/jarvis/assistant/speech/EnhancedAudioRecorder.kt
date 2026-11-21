@@ -45,7 +45,7 @@ class EnhancedAudioRecorder private constructor(
         fun create(
             context: Context? = null,
             useHardwareFx: Boolean = false,
-            preferBluetooth: Boolean = false,
+            route: MicRoute = MicRoute.PHONE,
             sampleRate: Int = 16000,
             channelConfig: Int = AudioFormat.CHANNEL_IN_MONO,
             audioFormat: Int = AudioFormat.ENCODING_PCM_16BIT,
@@ -58,7 +58,7 @@ class EnhancedAudioRecorder private constructor(
             // VOICE_RECOGNITION first: made for speech recognition, no call-mode side effects.
             // VOICE_COMMUNICATION switches the phone to "in-communication" audio processing
             // (volume/routing changes, ducking of other audio) and is only a last resort.
-            val sources = if (preferBluetooth) {
+            val sources = if (route == MicRoute.BLUETOOTH) {
                 // Bluetooth SCO works with the communication source.
                 intArrayOf(
                     MediaRecorder.AudioSource.VOICE_COMMUNICATION,
@@ -88,22 +88,19 @@ class EnhancedAudioRecorder private constructor(
 
             val audio = record ?: return null
 
-            // Wired / USB headset mic is close to the mouth: use it when plugged in.
-            // (Bluetooth headset mics need SCO "call mode", which wrecks music quality and drains
-            // the battery, so they are deliberately NOT used for always-on listening.)
-            if (context != null && preferBluetooth) {
-                BluetoothMicRouter.findInput(context)?.let {
-                    try { audio.setPreferredDevice(it) } catch (_: Exception) {}
+            // Pin the input to the SELECTED microphone. Never let Android silently pick another one, and
+            // never record from a device that is not connected (return null so the caller reports it).
+            if (context != null) {
+                val dev = when (route) {
+                    MicRoute.PHONE -> MicRouting.builtinMic(context)
+                    MicRoute.WIRED -> MicRouting.wiredMic(context)
+                    MicRoute.BLUETOOTH -> BluetoothMicRouter.findInput(context)
                 }
-            } else if (context != null) {
-                try {
-                    val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                    val wired = am.getDevices(AudioManager.GET_DEVICES_INPUTS).firstOrNull {
-                        it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
-                            it.type == AudioDeviceInfo.TYPE_USB_HEADSET
-                    }
-                    if (wired != null) audio.setPreferredDevice(wired)
-                } catch (_: Exception) {}
+                if (dev == null && route != MicRoute.PHONE) { audio.release(); return null }
+                if (dev != null) {
+                    val ok = try { audio.setPreferredDevice(dev) } catch (_: Exception) { false }
+                    if (!ok && route != MicRoute.PHONE) { audio.release(); return null }
+                }
             }
 
             var ns: NoiseSuppressor? = null

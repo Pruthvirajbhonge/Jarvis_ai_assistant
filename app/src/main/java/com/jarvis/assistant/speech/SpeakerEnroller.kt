@@ -20,7 +20,7 @@ class SpeakerEnroller(
     private val onProgress: (done: Int, total: Int, heard: String) -> Unit,
     private val onStatus: (msg: String) -> Unit,
     private val onDone: (ok: Boolean, msg: String) -> Unit,
-    private val targetSamples: Int = 5
+    private val targetSamples: Int = 10
 ) {
     private var thread: Thread? = null
     @Volatile private var isRunning = false
@@ -55,25 +55,26 @@ class SpeakerEnroller(
             val spkModel = SpeakerModel(spkModelDir.absolutePath)
 
             val sampleRate = 16000f
-            var btOk = false
-            if (MicPrefs.useBluetoothMic(context)) {
+            val route = MicRouting.selected(context)
+            if (route == MicRoute.BLUETOOTH) {
                 btRouter = BluetoothMicRouter(context)
-                btOk = btRouter!!.start()
-                if (!btOk) onStatus("Bluetooth mic not available, using the phone mic.")
+                if (!btRouter!!.start()) throw IllegalStateException("Bluetooth mic is not available. Connect it or select the phone mic.")
             }
 
             var recorder: EnhancedAudioRecorder? = null
             for (attempt in 1..4) { // `repeat` + return@repeat does NOT break: it opened 4 mics and leaked 3
-                val r = EnhancedAudioRecorder.create(context = context, preferBluetooth = btOk, sampleRate = sampleRate.toInt())
+                val r = EnhancedAudioRecorder.create(context = context, route = route, sampleRate = sampleRate.toInt())
                 if (r != null) { recorder = r; break }
                 if (!isRunning) return
                 Thread.sleep(400)
             }
 
-            val enhanced = recorder ?: throw IllegalStateException("Microphone is busy.")
+            val enhanced = recorder ?: throw IllegalStateException("The selected microphone ($route) is busy or not connected.")
             val audio = enhanced.audioRecord
 
             val agc = AdaptiveGain()
+            val utter = ShortArray(sampleRate.toInt() * 12)
+            var uLen = 0
             val rec = Recognizer(model, sampleRate, spkModel)
 
             onStatus("Say phrase 1 of $targetSamples aloud…")
@@ -88,9 +89,13 @@ class SpeakerEnroller(
                         if (n < 0) throw IOException("Audio read error $n")
                         if (n == 0) continue
 
+                        val room = utter.size - uLen
+                        if (room > 0) { System.arraycopy(buf, 0, utter, uLen, minOf(n, room)); uLen += minOf(n, room) }
                         agc.process(buf, n)
 
                         if (!rec.acceptWaveForm(buf, n)) continue
+                        val quality = AudioQuality.check(utter, uLen)
+                        uLen = 0
 
                         val o = JSONObject(rec.result)
                         val text = o.optString("text").trim()
@@ -99,6 +104,10 @@ class SpeakerEnroller(
                         val arr = o.optJSONArray("spk")
                         val frames = o.optInt("spk_frames", 0)
 
+                        if (!quality.ok) {
+                            onStatus("Sample rejected: ${quality.reason}")
+                            continue
+                        }
                         if (arr == null || frames < 40) {
                             onStatus("Phrase too short. Speak longer and clearly.")
                             continue

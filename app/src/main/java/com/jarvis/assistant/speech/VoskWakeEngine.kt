@@ -110,6 +110,14 @@ class VoskWakeEngine(
                 retryable = false
                 throw IllegalStateException("Owner voice is not enrolled. Enroll your voice in Settings.")
             }
+            val route = MicRouting.selected(context)
+            if (authActive && speakerEngine != null && !speakerEngine.routeMatches(route)) {
+                retryable = false
+                throw IllegalStateException(
+                    "Voice was enrolled with the ${speakerEngine.enrolledRoute} mic but the $route mic is selected. " +
+                        "Select the same mic or enroll again."
+                )
+            }
             // Wait for the previous loop to release the microphone (stop() is asynchronous).
             // Without this, a quick stop()->start() finds the mic busy and fails.
             try { prev?.join(2000) } catch (_: InterruptedException) {}
@@ -119,15 +127,17 @@ class VoskWakeEngine(
 
             var recorder: EnhancedAudioRecorder? = null
             for (attempt in 1..4) { // mic may still be held for a moment by the system recognizer / TTS
-                val r = EnhancedAudioRecorder.create(context = context, preferBluetooth = false, sampleRate = SAMPLE_RATE.toInt())
+                val r = EnhancedAudioRecorder.create(context = context, route = route, sampleRate = SAMPLE_RATE.toInt())
                 if (r != null) { recorder = r; break }
                 if (g != generation) return
                 Thread.sleep(400)
             }
-            val enhanced = recorder ?: throw IllegalStateException("Microphone is busy.")
+            val enhanced = recorder ?: throw IllegalStateException("The selected microphone ($route) is busy or not connected.")
             val audio = enhanced.audioRecord
 
             val agc = AdaptiveGain()
+            val utter = ShortArray(SAMPLE_RATE.toInt() * 12) // raw audio of the current utterance (quality gate)
+            var uLen = 0
             val rec = if (spk != null) Recognizer(m, SAMPLE_RATE, spk) else Recognizer(m, SAMPLE_RATE)
 
             rec.use {
@@ -139,9 +149,12 @@ class VoskWakeEngine(
                         if (n < 0) throw IOException("Audio read error $n")
                         if (n == 0) continue
 
+                        val room = utter.size - uLen
+                        if (room > 0) { System.arraycopy(buf, 0, utter, uLen, minOf(n, room)); uLen += minOf(n, room) }
                         agc.process(buf, n)
 
                         val isFinal = rec.acceptWaveForm(buf, n)
+                        val quality = if (isFinal) AudioQuality.check(utter, uLen).also { uLen = 0 } else null
                         val jsonStr = if (isFinal) rec.result else rec.partialResult
                         val o = JSONObject(jsonStr)
                         val text = if (isFinal) o.optString("text") else o.optString("partial")
@@ -154,6 +167,7 @@ class VoskWakeEngine(
 
                         if (authActive && speakerEngine != null) {
                             if (!isFinal) continue
+                            if (quality != null && !quality.ok) { onStatus(quality.reason); continue }
                             val arr = o.optJSONArray("spk")
                             val frames = o.optInt("spk_frames", 0)
                             if (arr == null || frames < MIN_SPK_FRAMES) {
